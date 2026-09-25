@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Starfall 3D</title>
+  <style>
+    :root { color-scheme: dark; --cyan: #61f5ff; --pink: #ff4f9a; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #02040c; font-family: 'Trebuchet MS', sans-serif; }
+    body { position: relative; }
+    #game { display: block; width: 100%; height: 100%; }
+    #hud { position: fixed; inset: 0; pointer-events: none; color: white; text-shadow: 0 2px 8px #000; }
+    .topbar { display: flex; justify-content: space-between; padding: 22px 28px; font-size: 16px; letter-spacing: .14em; text-transform: uppercase; }
+    .topbar strong { color: var(--cyan); font-size: 25px; letter-spacing: .08em; }
+    #lives { color: #ff719d; letter-spacing: .18em; }
+    #special { position: fixed; left: 50%; top: 22px; width: min(280px, 42vw); transform: translateX(-50%); text-align: center; color: #ffef8a; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+    #special-track { height: 8px; margin-top: 7px; border: 1px solid #ffef8a99; background: #281f3a; box-shadow: 0 0 12px #ffef8a44; }
+    #special-fill { width: 0%; height: 100%; background: #fff36b; box-shadow: 0 0 14px #fff36b; transition: width .15s ease; }
+    #boss-hud { position: fixed; left: 50%; bottom: 54px; width: min(360px, 58vw); transform: translateX(-50%); color: #ff779f; text-align: center; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+    #boss-track { height: 8px; margin-top: 6px; border: 1px solid #ff779f99; background: #321323; }
+    #boss-fill { width: 100%; height: 100%; background: #ff477e; box-shadow: 0 0 14px #ff477e; transition: width .12s ease; }
+    #message { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1); text-align: center; pointer-events: auto; opacity: 1; transition: opacity .28s ease, transform .28s ease; }
+    #message.screen-fade { opacity: 0; transform: translate(-50%, -50%) scale(.94); pointer-events: none; }
+    #scene-transition { position: fixed; inset: 0; z-index: 10; background: #02040c; opacity: 0; pointer-events: none; transition: opacity .42s ease; }
+    #scene-transition.active { opacity: 1; pointer-events: auto; }
+    #message h1 { margin: 0 0 12px; color: var(--cyan); font-size: clamp(36px, 8vw, 76px); letter-spacing: .16em; text-shadow: 0 0 26px #1cbccc; }
+    #message p { margin: 8px 0 26px; color: #d8e9ff; letter-spacing: .08em; }
+    #level-map { display: grid; grid-template-columns: repeat(5, minmax(48px, 1fr)); gap: 10px; width: min(420px, 80vw); margin: 22px auto 0; }
+    .level-button { padding: 12px 8px; color: #b9c9de; background: #101b35; border: 1px solid #406080; box-shadow: none; font-size: 13px; }
+    .level-button.unlocked { color: #031019; background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 16px #2de2ec66; }
+    .level-button.completed { color: #fff; background: #263d5b; border-color: #61f5ff; }
+    .level-button:disabled { cursor: not-allowed; opacity: .42; }
+    button { border: 1px solid var(--cyan); padding: 13px 25px; color: #031019; background: var(--cyan); cursor: pointer; font: inherit; font-weight: bold; letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 0 20px #2de2ec88; }
+    button:hover { background: white; }
+    #controls { position: absolute; left: 28px; bottom: 22px; color: #9cb0c7; font-size: 12px; letter-spacing: .08em; }
+    #aim { position: absolute; left: 0; top: 0; width: 40px; height: 40px; transform: translate(-50%, -50%); color: var(--cyan); opacity: .82; transition: color .12s ease, opacity .12s ease, transform .12s ease; }
+    #aim::before, #aim::after { content: ''; position: absolute; left: 50%; top: 50%; background: currentColor; transform: translate(-50%, -50%); box-shadow: 0 0 12px currentColor; }
+    #aim::before { width: 2px; height: 100%; }
+    #aim::after { width: 100%; height: 2px; }
+    #aim .reticle { position: absolute; inset: 13px; border: 2px solid currentColor; border-radius: 50%; box-shadow: 0 0 18px currentColor, inset 0 0 12px currentColor; }
+    #aim .reticle::after { content: ''; position: absolute; inset: 15px; border: 1px solid currentColor; border-radius: 50%; }
+    #aim.alert { color: #ff315f; opacity: 1; transform: translate(-50%, -50%) scale(1.14); }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="scene-transition"></div>
+  <div id="hud">
+    <div class="topbar hidden" id="game-hud"><div>Score <strong id="score">000000</strong></div><div id="lives">♥ ♥ ♥</div></div>
+    <div id="special" class="hidden">Laser <span id="special-count">0/15</span><div id="special-track"><div id="special-fill"></div></div></div>
+    <div id="aim" class="hidden" aria-label="Mira"><div class="reticle"></div></div>
+    <div id="message"><h1>STARFALL</h1><p>Uma nova dimensão para a sua missão.</p><button id="start">Abrir mapa</button><div id="level-map" class="hidden"></div></div>
+    <div id="boss-hud" class="hidden">CHEFE <div id="boss-track"><div id="boss-fill"></div></div></div>
+    <div id="controls" class="hidden">WASD / SETAS: mover &nbsp; • &nbsp; ESPAÇO: disparar &nbsp; • &nbsp; X: laser &nbsp; • &nbsp; ENTER: pausar</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+    const canvas = document.querySelector('#game');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x02040c, 0.012);
+    new THREE.TextureLoader().load(
+      'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=2400&q=85',
+      texture => { texture.colorSpace = THREE.SRGBColorSpace; scene.background = texture; },
+      undefined,
+      () => { scene.background = new THREE.Color(0x02040c); }
+    );
+    scene.backgroundIntensity = .28;
+    const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 220);
+    camera.position.set(0, 4, 16);
+    camera.lookAt(0, 0, -20);
+    scene.add(new THREE.HemisphereLight(0x86bfff, 0x080b1d, 1.6));
+    const keyLight = new THREE.PointLight(0x62e8ff, 18, 60);
+    keyLight.position.set(0, 8, 4); scene.add(keyLight);
+
+    const field = new THREE.Group(); scene.add(field);
+    const starGeometry = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(900 * 3);
+    for (let i = 0; i < starPositions.length; i += 3) {
+      starPositions[i] = (Math.random() - .5) * 100;
+      starPositions[i + 1] = (Math.random() - .5) * 70;
+      starPositions[i + 2] = -Math.random() * 150;
+    }
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    field.add(new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xb8e8ff, size: .16, transparent: true, opacity: .9 })));
+
+    const planets = new THREE.Group();
+    scene.add(planets);
+    const planetStyles = [
+      { color: 0x4d8dcc, emissive: 0x0b254d },
+      { color: 0xd36b4f, emissive: 0x4a160e },
+      { color: 0x9b6cc7, emissive: 0x2e124c },
+      { color: 0x58b89d, emissive: 0x0c3b35 }
+    ];
+    for (let i = 0; i < 7; i++) {
+      const style = planetStyles[i % planetStyles.length];
+      const radius = .8 + Math.random() * 2.2;
+      const planet = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 24, 16),
+        new THREE.MeshStandardMaterial({ color: style.color, emissive: style.emissive, emissiveIntensity: .45, roughness: .8 })
+      );
+      planet.position.set((Math.random() - .5) * 38, (Math.random() - .5) * 24, -28 - Math.random() * 105);
+      planets.add(planet);
+      if (i % 2 === 1) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(radius * 1.45, .06 + radius * .025, 8, 32),
+          new THREE.MeshBasicMaterial({ color: style.color, transparent: true, opacity: .5 })
+        );
+        ring.rotation.x = Math.PI * .35;
+        ring.rotation.z = Math.PI * .12;
+        planet.add(ring);
+      }
+    }
+
+    function makeShip() {
+      const ship = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.ConeGeometry(1.05, 3.4, 4), new THREE.MeshStandardMaterial({ color: 0x7eeaff, metalness: .75, roughness: .2, emissive: 0x073c62, emissiveIntensity: 1.2 }));
+      body.rotation.x = -Math.PI / 2; ship.add(body);
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(3.4, .18, 1.25), new THREE.MeshStandardMaterial({ color: 0x214f94, metalness: .7, roughness: .25, emissive: 0x092a55 }));
+      wing.rotation.z = .12; wing.position.z = .65; ship.add(wing);
+      const cockpit = new THREE.Mesh(new THREE.SphereGeometry(.48, 16, 8), new THREE.MeshStandardMaterial({ color: 0xff9bf0, emissive: 0xc029b2, emissiveIntensity: 2, metalness: .4, roughness: .15 }));
+      cockpit.scale.set(1, .45, 1.5); cockpit.position.set(0, .35, -.35); ship.add(cockpit);
+      const glow = new THREE.PointLight(0x25dfff, 5, 9); glow.position.z = 1.45; ship.add(glow);
+      return ship;
+    }
+
+    function makeEnemy() {
+      const enemy = new THREE.Group();
+      const hull = new THREE.Mesh(new THREE.ConeGeometry(.8, 2.7, 4), new THREE.MeshStandardMaterial({ color: 0xff477e, emissive: 0x750d43, emissiveIntensity: 1.4, metalness: .65, roughness: .25 }));
+      hull.rotation.x = Math.PI / 2; enemy.add(hull);
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(3, .16, .9), new THREE.MeshStandardMaterial({ color: 0x8b245c, emissive: 0x4a0d38, emissiveIntensity: 1.2, metalness: .7, roughness: .25 }));
+      wing.rotation.z = -.16; wing.position.z = .55; enemy.add(wing);
+      const cockpit = new THREE.Mesh(new THREE.SphereGeometry(.35, 12, 8), new THREE.MeshStandardMaterial({ color: 0xffd36a, emissive: 0xff5c22, emissiveIntensity: 2, metalness: .3, roughness: .2 }));
+      cockpit.scale.set(1, .45, 1.4); cockpit.position.set(0, .25, -.3); enemy.add(cockpit);
+      const engineGlow = new THREE.PointLight(0xff275e, 5, 8); engineGlow.position.z = 1.35; enemy.add(engineGlow);
+      return enemy;
+    }
+
+    function makeTarget() {
+      const target = new THREE.Group();
+      const material = new THREE.MeshBasicMaterial({ color: 0x61f5ff, transparent: true, opacity: .9 });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.95, .045, 8, 32), material);
+      ring.rotation.x = Math.PI / 2; target.add(ring);
+      const marks = new THREE.Group();
+      const markGeometry = new THREE.BoxGeometry(.55, .045, .045);
+      [-1, 1].forEach(side => {
+        const mark = new THREE.Mesh(markGeometry, material); mark.position.x = side * 2.25; marks.add(mark);
+        const vertical = new THREE.Mesh(markGeometry, material); vertical.rotation.y = Math.PI / 2; vertical.position.z = side * 2.25; marks.add(vertical);
+      });
+      target.add(marks); target.userData.material = material;
+      return target;
+    }
+
+    const ship = makeShip(); ship.scale.setScalar(.65); ship.position.set(0, 0, 7); scene.add(ship);
+    const target = makeTarget(); ship.add(target); target.position.z = -10.5; target.scale.setScalar(.36);
+    const keys = {}; const enemies = []; const shots = []; const enemyShots = []; const effects = [];
+    const levelTargets = [50, 70, 90, 110, 130, 150, 170, 190, 210, 230];
+    const bossScales = [0, 0, 3, 0, 6, 0, 9, 0, 12, 0, 16];
+    const bossMoveSpeeds = [0, 0, 2, 0, 2.5, 0, 3, 0, 5, 0, 6];
+    let score = 0, lives = 3, hitsTaken = 0, kills = 0, levelKills = 0, currentLevel = 1, unlockedLevel = 1, running = false, paused = false, lastSpawn = 0, lastShot = 0, laser = null, boss = null, damageBlink = null;
+    let screen = 'intro';
+    let transitionTimer = null;
+    const clock = new THREE.Clock();
+    const scoreElement = document.querySelector('#score');
+    const livesElement = document.querySelector('#lives');
+    const message = document.querySelector('#message');
+    const startButton = document.querySelector('#start');
+    const gameHud = document.querySelector('#game-hud');
+    const controls = document.querySelector('#controls');
+    const special = document.querySelector('#special');
+    const sceneTransition = document.querySelector('#scene-transition');
+    const levelMap = document.querySelector('#level-map');
+    const bossHud = document.querySelector('#boss-hud');
+    const bossFill = document.querySelector('#boss-fill');
+    const specialCount = document.querySelector('#special-count');
+    const specialFill = document.querySelector('#special-fill');
+    const aim = document.querySelector('#aim');
+    const shotSound = new Audio('snd/tiro.mp3');
+    const explosionSound = new Audio('snd/explosao.mp3');
+    shotSound.volume = .3;
+    explosionSound.volume = .45;
+    const aimPosition = new THREE.Vector3();
+      const screenCorner = new THREE.Vector3();
+      const screenRay = new THREE.Vector3();
+      const screenBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+
+      function keepObjectOnScreen(position, paddingX, paddingY) {
+        const corners = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+        screenBounds.minX = Infinity; screenBounds.maxX = -Infinity;
+        screenBounds.minY = Infinity; screenBounds.maxY = -Infinity;
+        corners.forEach(([x, y]) => {
+          screenCorner.set(x, y, .5).unproject(camera);
+          screenRay.copy(screenCorner).sub(camera.position);
+          const distance = (position.z - camera.position.z) / screenRay.z;
+          const point = camera.position.clone().addScaledVector(screenRay, distance);
+          screenBounds.minX = Math.min(screenBounds.minX, point.x);
+          screenBounds.maxX = Math.max(screenBounds.maxX, point.x);
+          screenBounds.minY = Math.min(screenBounds.minY, point.y);
+          screenBounds.maxY = Math.max(screenBounds.maxY, point.y);
+        });
+        position.x = THREE.MathUtils.clamp(position.x, screenBounds.minX + paddingX, screenBounds.maxX - paddingX);
+        position.y = THREE.MathUtils.clamp(position.y, screenBounds.minY + paddingY, screenBounds.maxY - paddingY);
+      }
+
+    function updateHud() {
+      scoreElement.textContent = String(score).padStart(6, '0');
+      livesElement.textContent = '♥ '.repeat(Math.max(0, lives)).trim();
+      specialCount.textContent = `${kills}/15`;
+      specialFill.style.width = `${Math.min(100, kills / 15 * 100)}%`;
+    }
+    function playSound(audio) {
+      const sound = audio.cloneNode();
+      sound.volume = audio.volume;
+      sound.play().catch(() => {});
+    }
+    function fire() {
+      const now = performance.now(); if (!running || paused || now - lastShot < 180) return; lastShot = now;
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(.2, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfff36b }));
+      mesh.position.copy(ship.position); mesh.position.z -= 1.9; scene.add(mesh); shots.push({ mesh, speed: 38 });
+      playSound(shotSound);
+    }
+    function enemyFire(enemy) {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(.16, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff596f }));
+      mesh.position.copy(enemy.mesh.position); mesh.position.z += 1.2; scene.add(mesh);
+      enemyShots.push({ mesh, speed: 20 });
+      playSound(shotSound);
+    }
+    function fireLaser() {
+      if (!running || paused || kills < 15 || laser) return;
+      kills = 0;
+      const mesh = new THREE.Group();
+      const colors = [0x61f5ff, 0xff4f9a, 0xfff36b, 0x9b6cff];
+      mesh.position.copy(ship.position);
+      for (let index = 0; index < 12; index++) {
+        const material = new THREE.MeshBasicMaterial({
+          color: colors[index % colors.length],
+          transparent: true,
+          opacity: .92,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const segment = new THREE.Mesh(new THREE.CylinderGeometry(.16, .16, 3.05, 12), material);
+        const angle = index * Math.PI / 3;
+        segment.position.set(Math.cos(angle) * .16, Math.sin(angle) * .16, -1.5 - index * 3);
+        segment.rotation.x = Math.PI / 2;
+        mesh.add(segment);
+      }
+      const core = new THREE.Mesh(
+        new THREE.CylinderGeometry(.075, .075, 36, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .95, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      core.rotation.x = Math.PI / 2;
+      core.position.z = -18;
+      mesh.add(core);
+      scene.add(mesh);
+      laser = { mesh, life: .28 };
+      for (let index = enemies.length - 1; index >= 0; index--) {
+        const enemy = enemies[index];
+        const inHorizon = enemy.mesh.position.z < ship.position.z && enemy.mesh.position.z > -65;
+        if (inHorizon) {
+          explode(enemy.mesh.position, 0xfff36b);
+          scene.remove(enemy.mesh);
+          enemies.splice(index, 1);
+          score += 10;
+          registerKill();
+        }
+      }
+      updateHud();
+    }
+    function renderMap() {
+      levelMap.innerHTML = levelTargets.map((target, index) => {
+        const level = index + 1;
+        const locked = level > unlockedLevel;
+        const completed = level < unlockedLevel;
+        const bossLabel = level % 2 === 0 ? ' + CHEFE' : '';
+        return `<button class="level-button ${locked ? '' : 'unlocked'} ${completed ? 'completed' : ''}" data-level="${level}" ${locked ? 'disabled' : ''}>NÍVEL ${level}<br><small>${target} ALVOS${bossLabel}</small></button>`;
+      }).join('');
+      levelMap.querySelectorAll('[data-level]').forEach(button => button.addEventListener('click', () => startLevel(Number(button.dataset.level))));
+    }
+    function showMap(title = 'MAPA DE MISSÕES', text = 'Escolha uma rota para continuar a campanha.', delay = 280) {
+      if (transitionTimer) clearTimeout(transitionTimer);
+      sceneTransition.classList.add('active');
+      message.classList.add('screen-fade');
+      transitionTimer = setTimeout(() => {
+        screen = 'map';
+        running = false;
+        ship.visible = false;
+        gameHud.classList.add('hidden');
+        special.classList.add('hidden');
+        aim.classList.add('hidden');
+        controls.classList.remove('hidden');
+        bossHud.classList.add('hidden');
+        message.querySelector('h1').textContent = title;
+        message.querySelector('p').textContent = text;
+        startButton.classList.add('hidden');
+        levelMap.classList.remove('hidden');
+        message.classList.remove('hidden');
+        renderMap();
+        requestAnimationFrame(() => { sceneTransition.classList.remove('active'); message.classList.remove('screen-fade'); });
+      }, delay);
+    }
+    function clearBattlefield(keepEffects = false) {
+      enemies.splice(0).forEach(item => scene.remove(item.mesh));
+      shots.splice(0).forEach(item => scene.remove(item.mesh));
+      enemyShots.splice(0).forEach(item => scene.remove(item.mesh));
+      if (!keepEffects) effects.splice(0).forEach(item => scene.remove(item.mesh));
+      if (laser) { scene.remove(laser.mesh); laser = null; }
+      if (boss) { scene.remove(boss.mesh); boss = null; }
+    }
+    function startLevel(level) {
+      if (transitionTimer) clearTimeout(transitionTimer);
+      sceneTransition.classList.add('active');
+      message.classList.add('screen-fade');
+      transitionTimer = setTimeout(() => {
+        clearBattlefield();
+        screen = 'game'; currentLevel = level; levelKills = 0; kills = 0; score = level === 1 ? 0 : score; lives = 3; hitsTaken = 0; damageBlink = null;
+        clearKeys(); running = true; paused = false; ship.position.set(0, 0, 7); ship.visible = true; lastSpawn = performance.now();
+        levelMap.classList.add('hidden'); startButton.classList.add('hidden'); message.classList.add('hidden'); gameHud.classList.remove('hidden'); special.classList.remove('hidden'); aim.classList.remove('hidden'); controls.classList.add('hidden'); bossHud.classList.add('hidden'); updateHud();
+        requestAnimationFrame(() => { sceneTransition.classList.remove('active'); message.classList.remove('screen-fade'); });
+      }, 280);
+    }
+    function completeLevel() {
+      running = false;
+      clearBattlefield(true);
+      bossHud.classList.add('hidden');
+      unlockedLevel = Math.max(unlockedLevel, Math.min(10, currentLevel + 1));
+      const finished = currentLevel === 10;
+      showMap(finished ? 'CAMPANHA CONCLUÍDA' : `NÍVEL ${currentLevel} CONCLUÍDO`, finished ? 'Você dominou toda a rota estelar.' : 'A próxima rota foi liberada.', currentLevel % 2 === 0 ? 2500 : 280);
+    }
+    function startBoss() {
+      if (boss) return;
+      const mesh = makeEnemy();
+      const scale = bossScales[currentLevel];
+      mesh.scale.setScalar(scale * .65);
+      mesh.position.set(0, 1, -22);
+      scene.add(mesh);
+      const maxHealth = 20 + currentLevel * 5;
+      boss = { mesh, health: maxHealth, maxHealth, moveSpeed: bossMoveSpeeds[currentLevel], moveDirection: 1, nextMove: performance.now() + 500, nextShot: performance.now() + 800, nextSpawn: performance.now() + 1400 };
+      bossHud.classList.remove('hidden');
+      bossFill.style.width = '100%';
+    }
+    function registerKill() {
+      kills = Math.min(15, kills + 1);
+      levelKills++;
+      if (levelKills >= levelTargets[currentLevel - 1] && !boss) {
+        if (currentLevel % 2 === 0) startBoss();
+        else completeLevel();
+      }
+    }
+    function explode(position, color = 0xff6a53, duration = .55) {
+      const mesh = new THREE.Group();
+      const core = new THREE.Mesh(new THREE.SphereGeometry(.3, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfff3a1, transparent: true }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(.55, .06, 8, 20), new THREE.MeshBasicMaterial({ color, transparent: true }));
+      ring.rotation.x = Math.PI / 2;
+      mesh.add(core, ring);
+      for (let index = 0; index < 8; index++) {
+        const spark = new THREE.Mesh(new THREE.SphereGeometry(.07, 6, 4), new THREE.MeshBasicMaterial({ color, transparent: true }));
+        const angle = index * Math.PI / 4;
+        spark.position.set(Math.cos(angle) * .65, Math.sin(angle) * .65, (index % 2 ? .2 : -.2));
+        mesh.add(spark);
+      }
+      mesh.position.copy(position); scene.add(mesh); effects.push({ mesh, life: duration, max: duration });
+      playSound(explosionSound);
+    }
+    function updateEffects(delta) {
+      effects.forEach((effect, index) => {
+        effect.life -= delta;
+        const scale = 1 + (1 - effect.life / effect.max) * 5;
+        effect.mesh.scale.setScalar(scale);
+        effect.mesh.traverse(child => { if (child.material) child.material.opacity = Math.max(0, effect.life / effect.max); });
+        if (effect.life <= 0) { scene.remove(effect.mesh); effects.splice(index, 1); }
+      });
+    }
+    function spawnEnemy() {
+      const mesh = makeEnemy(); mesh.position.set((Math.random() - .5) * 15, (Math.random() - .5) * 6, -55); scene.add(mesh);
+      enemies.push({
+        mesh,
+        speed: 8 + Math.random() * 7,
+        driftX: (Math.random() - .5) * 3.2,
+        driftY: (Math.random() - .5) * 2.6,
+        nextDrift: performance.now() + 350 + Math.random() * 500,
+        nextShot: performance.now() + 900 + Math.random() * 1500
+      });
+    }
+    function startDamageBlink() {
+      damageBlink = { toggles: 6, timer: 0 };
+      ship.visible = true;
+    }
+    function loseLife() {
+        damageBlink = null;
+        lives--; hitsTaken = 0; updateHud(); explode(ship.position, 0x55eaff); ship.visible = false;
+        setTimeout(() => { if (running && lives > 0) { ship.visible = true; ship.position.set(0, 0, 7); } }, 550);
+      if (lives <= 0) endGame();
+    }
+    function endGame() {
+      running = false;
+      paused = false;
+      ship.visible = false;
+      gameHud.classList.add('hidden');
+      special.classList.add('hidden');
+      aim.classList.add('hidden');
+      controls.classList.add('hidden');
+      message.querySelector('h1').textContent = 'MISSÃO ENCERRADA';
+      message.querySelector('p').textContent = `Pontuação final: ${score}`;
+      startButton.textContent = 'Voltar ao mapa';
+      startButton.classList.remove('hidden');
+      levelMap.classList.add('hidden');
+      message.classList.remove('hidden');
+    }
+    startButton.addEventListener('click', () => showMap());
+    function clearKeys() {
+      Object.keys(keys).forEach(key => { keys[key] = false; });
+    }
+    addEventListener('keydown', event => { keys[event.key.toLowerCase()] = true; if (event.code === 'Space') { event.preventDefault(); fire(); } if (event.key.toLowerCase() === 'x') fireLaser(); if (event.key === 'Enter' && running) paused = !paused; });
+    addEventListener('keyup', event => { keys[event.key.toLowerCase()] = false; });
+    addEventListener('blur', clearKeys);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) clearKeys(); });
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+    function animate() {
+      requestAnimationFrame(animate); const delta = Math.min(clock.getDelta(), .05); const now = performance.now();
+      if (running && !paused) {
+        const horizontal = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
+        const vertical = (keys.arrowup || keys.w ? 1 : 0) - (keys.arrowdown || keys.s ? 1 : 0);
+        if (damageBlink) {
+          damageBlink.timer -= delta;
+          if (damageBlink.timer <= 0) {
+            ship.visible = !ship.visible;
+            damageBlink.toggles--;
+            damageBlink.timer = .1;
+            if (damageBlink.toggles <= 0) { ship.visible = true; damageBlink = null; }
+          }
+        }
+        ship.position.x += horizontal * delta * 14;
+        ship.position.y += vertical * delta * 11;
+        keepObjectOnScreen(ship.position, 1.2, .7);
+        ship.rotation.z += (horizontal * -.08 - ship.rotation.z) * delta * 8;
+        target.rotation.z -= delta * 1.6;
+        target.getWorldPosition(aimPosition);
+        aimPosition.project(camera);
+        aim.style.left = `${(aimPosition.x * .5 + .5) * innerWidth}px`;
+        aim.style.top = `${(-aimPosition.y * .5 + .5) * innerHeight}px`;
+        const alignedEnemy = enemies.some(enemy => {
+          const dx = Math.abs(enemy.mesh.position.x - ship.position.x);
+          const dy = Math.abs(enemy.mesh.position.y - ship.position.y);
+          const forwardDistance = ship.position.z - enemy.mesh.position.z;
+          return forwardDistance > 0 && forwardDistance < 22 && dx < 1.45 && dy < 1.45;
+        });
+        aim.classList.toggle('alert', alignedEnemy);
+        target.userData.material.color.set(alignedEnemy ? 0xff315f : 0x61f5ff);
+        target.userData.material.opacity = alignedEnemy ? .98 : .72;
+        if (!boss && levelKills < levelTargets[currentLevel - 1] && now - lastSpawn > Math.max(360, 850 - score * 2)) { spawnEnemy(); lastSpawn = now; }
+        shots.forEach((shot, index) => { shot.mesh.position.z -= shot.speed * delta; if (shot.mesh.position.z < -65) { scene.remove(shot.mesh); shots.splice(index, 1); } });
+        enemies.forEach((enemy, enemyIndex) => {
+          enemy.mesh.position.z += enemy.speed * delta;
+          if (now > enemy.nextDrift) {
+            enemy.driftX = THREE.MathUtils.clamp(enemy.driftX + (Math.random() - .5) * 2.4, -2.8, 2.8);
+            enemy.driftY = THREE.MathUtils.clamp(enemy.driftY + (Math.random() - .5) * 2, -2.2, 2.2);
+            enemy.nextDrift = now + 300 + Math.random() * 700;
+          }
+          const approachX = (ship.position.x - enemy.mesh.position.x) * .22;
+          const approachY = (ship.position.y - enemy.mesh.position.y) * .22;
+          enemy.mesh.position.x += (approachX + enemy.driftX) * delta;
+          enemy.mesh.position.y += (approachY + enemy.driftY) * delta;
+          keepObjectOnScreen(enemy.mesh.position, 1.7, .9);
+          if (now > enemy.nextShot && enemy.mesh.position.z < ship.position.z - 4) { enemyFire(enemy); enemy.nextShot = now + 1000 + Math.random() * 1800; }
+          if (enemy.mesh.position.distanceTo(ship.position) < 1.8 && ship.visible) { scene.remove(enemy.mesh); enemies.splice(enemyIndex, 1); loseLife(); return; }
+          shots.forEach((shot, shotIndex) => { if (enemy.mesh.position.distanceTo(shot.mesh.position) < 1.55) { explode(enemy.mesh.position); scene.remove(enemy.mesh); scene.remove(shot.mesh); enemies.splice(enemyIndex, 1); shots.splice(shotIndex, 1); score += 10; registerKill(); updateHud(); } });
+          if (enemy.mesh.position.z > 14) { scene.remove(enemy.mesh); enemies.splice(enemyIndex, 1); }
+        });
+        if (boss) {
+          if (now > boss.nextMove) {
+            boss.moveDirection = Math.random() < .5 ? -1 : 1;
+            boss.nextMove = now + 450 + Math.random() * 900;
+          }
+          boss.mesh.position.x += boss.moveDirection * boss.moveSpeed * 2.4 * delta;
+          keepObjectOnScreen(boss.mesh.position, Math.min(4.5, 1.8 + boss.mesh.scale.x * .12), Math.min(2.2, 1 + boss.mesh.scale.y * .08));
+          if (now > boss.nextShot) { enemyFire(boss); boss.nextShot = now + 900; }
+          if (now > boss.nextSpawn) { spawnEnemy(); boss.nextSpawn = now + 1800; }
+          shots.forEach((shot, shotIndex) => {
+            if (boss && boss.mesh.position.distanceTo(shot.mesh.position) < 3.2 * boss.mesh.scale.x) {
+              boss.health--; scene.remove(shot.mesh); shots.splice(shotIndex, 1); explode(boss.mesh.position, 0xfff36b);
+              bossFill.style.width = `${Math.max(0, boss.health / boss.maxHealth * 100)}%`;
+              if (boss.health <= 0) { score += 100; explode(boss.mesh.position, 0xff477e, 2.5); completeLevel(); }
+            }
+          });
+        }
+        enemyShots.forEach((shot, shotIndex) => {
+          shot.mesh.position.z += shot.speed * delta;
+          if (ship.visible && shot.mesh.position.distanceTo(ship.position) < 1.15) {
+            scene.remove(shot.mesh); enemyShots.splice(shotIndex, 1); hitsTaken++; startDamageBlink(); explode(ship.position, 0xff315f);
+            if (hitsTaken >= 3) loseLife();
+          } else if (shot.mesh.position.z > 14) {
+            scene.remove(shot.mesh); enemyShots.splice(shotIndex, 1);
+          }
+        });
+        if (laser) {
+          laser.life -= delta;
+          const opacity = Math.max(0, laser.life / .28);
+          laser.mesh.children.forEach(segment => { segment.material.opacity = opacity; });
+          if (laser.life <= 0) { scene.remove(laser.mesh); laser = null; }
+        }
+      }
+      updateEffects(delta);
+      renderer.render(scene, camera);
+    }
+    updateHud(); requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
