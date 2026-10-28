@@ -48,6 +48,7 @@ body { position: relative; }
 .pause-panel h1 { margin: 0 0 8px; color: var(--cyan); font-size: clamp(25px, 6vw, 38px); letter-spacing: .12em; text-shadow: 0 0 20px #1cbccc; }
 .pause-panel button { width: 100%; }
 #level-map { display: grid; grid-template-columns: repeat(5, minmax(48px, 1fr)); gap: 10px; width: min(480px, 86vw); margin: 22px auto 0; }
+#level-map.hidden { display: none; }
 .mission-entry { display: grid; grid-template-rows: 20px auto; gap: 4px; min-width: 0; }
 .mission-stars { display: flex; justify-content: center; gap: 2px; color: #526078; font-size: 17px; line-height: 20px; text-shadow: none; }
 .mission-stars .earned { color: #ffe66d; text-shadow: 0 0 8px #ffbd35aa; }
