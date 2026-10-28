@@ -1,4 +1,5 @@
 // Gerado por gerar_nave_jogo.py. Nao edite a mao: rode o script de novo.
+// Este arquivo e somente configuracao de leitura da matriz da nave.
 // elevacoes: graus da camera sobre a nave. Positivo = camera acima (mostra o dorso);
 // negativo = camera abaixo (mostra a barriga). Cada elevacao e uma linha da matriz.
 // escalas: fator de render de cada linha (o jogo compensa para a nave manter o mesmo tamanho).

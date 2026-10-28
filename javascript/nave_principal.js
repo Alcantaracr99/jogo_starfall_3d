@@ -1,9 +1,11 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { createPlayerShip as criarNaveGeometrica } from './entidades.js';
+import { criarNaveJogador as criarNaveGeometrica } from './entidades.js';
 import { ATLAS_NAVE } from './nave_atlas.js';
 import { EstadoVista, escolherQuadro } from './nave_vista.js';
 
+// ---------------------------------------------------------------------------
 // Nave principal baseada na matriz de vistas (img/nave_vista.png).
+// ---------------------------------------------------------------------------
 // Mantem o mesmo contrato da nave geometrica antiga: devolve um THREE.Group com a frente em -Z,
 // entao jogo.js continua usando ship.position, ship.rotation.z, ship.visible, ship.add(target) etc.
 // A nave geometrica original fica como reserva: aparece enquanto a imagem carrega ou se ela falhar.
@@ -13,6 +15,7 @@ const TAMANHO_SPRITE = LARGURA_ALVO / ATLAS_NAVE.larguraRelativa;
 const TAMANHO_EXPLOSAO = 7.5;              // lado do quadro de explosao, em unidades do mundo
 const FPS_EXPLOSAO = 14;
 
+// ---- Texturas e recorte de quadros -----------------------------------------
 function carregarTextura(caminho, aoCarregar, aoFalhar) {
   const textura = new THREE.TextureLoader().load(new URL(caminho, import.meta.url).href, aoCarregar, undefined, aoFalhar);
   textura.colorSpace = THREE.SRGBColorSpace;
@@ -27,7 +30,7 @@ function mostrarQuadro(textura, coluna, linha, colunas, linhas) {
   textura.offset.set(coluna / colunas, 1 - (linha + 1) / linhas);
 }
 
-export function createPlayerShip() {
+export function criarNaveJogador() {
   const ship = new THREE.Group();
   const reserva = criarNaveGeometrica();
   ship.add(reserva);
@@ -58,8 +61,9 @@ export function createPlayerShip() {
   return ship;
 }
 
+// ---- Atualizacao da vista em voo -------------------------------------------
 // Chame uma vez por quadro, depois de mover/inclinar a nave.
-export function updatePlayerShipView(ship, camera, delta) {
+export function atualizarVistaNaveJogador(ship, camera, delta) {
   const vista = ship.userData.vista;
   if (!vista) return;
   const vy = vista.estado.atualizar(ship.position.y, delta);   // acompanha a velocidade mesmo durante o pisca de dano
@@ -76,7 +80,7 @@ export function updatePlayerShipView(ship, camera, delta) {
   vista.sprite.scale.set(lado, lado, 1);
 }
 
-// ---- Explosao da nave (img/nave_explosao.png, 4 x 2 quadros) ----
+// ---- Explosao da nave (img/nave_explosao.png, 4 x 2 quadros) ----------------
 const explosao = { sprite: null, material: null, tempo: 0, ativa: false };
 
 function prepararExplosao() {
@@ -88,7 +92,7 @@ function prepararExplosao() {
   explosao.sprite.visible = false;
 }
 
-export function spawnShipExplosion(scene, position, final = false) {
+export function gerarExplosaoNave(scene, position, final = false) {
   prepararExplosao();
   if (explosao.sprite.parent !== scene) scene.add(explosao.sprite);
   const lado = TAMANHO_EXPLOSAO * (final ? 1.35 : 1);
@@ -101,7 +105,7 @@ export function spawnShipExplosion(scene, position, final = false) {
   mostrarQuadro(explosao.material.map, 0, 0, ATLAS_NAVE.explosao.colunas, ATLAS_NAVE.explosao.linhas);
 }
 
-export function updateShipExplosions(delta) {
+export function atualizarExplosoesNave(delta) {
   if (!explosao.ativa) return;
   explosao.tempo += delta;
   const indice = Math.floor(explosao.tempo * FPS_EXPLOSAO);

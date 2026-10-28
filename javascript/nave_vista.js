@@ -1,13 +1,15 @@
 import { ATLAS_NAVE } from './nave_atlas.js';
 
-// Logica pura (sem Three.js) que decide QUAL quadro da matriz de vistas mostrar.
+// ---------------------------------------------------------------------------
+// Selecao pura do quadro visual da nave do jogador.
+// ---------------------------------------------------------------------------
 //
 // A matriz tem uma linha por elevacao da camera sobre a nave e uma coluna por inclinacao lateral:
 //   linha  = de que altura a camera "enxerga" a nave (negativo = de baixo, mostra a barriga;
 //            positivo = de cima, mostra o dorso)
 //   coluna = inclinacao lateral (0 = esquerda total, 3 = neutro, 6 = direita total)
 
-// ---- Ajustes de sensacao (pode mexer a vontade) ----
+// ---- Parametros calibrados da sensacao de voo ------------------------------
 export const GANHO_VELOCIDADE = 2.4;  // graus de elevacao por (unidade/s) de velocidade vertical.
                                       // Subindo a camera "fica para baixo" (barriga); descendo, "para cima" (dorso).
                                       // 0 desliga o efeito e deixa so a perspectiva real da camera.
@@ -19,6 +21,7 @@ export const VELOCIDADE_MAX = 13;     // ignora saltos (respawn teleporta a nave
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const paraGraus = rad => rad * 180 / Math.PI;
 
+// Calcula a perspectiva vertical antes do ajuste causado pela velocidade.
 // Angulo (graus) com que a camera enxerga a nave: + = camera acima da nave.
 export function elevacaoGeometrica(camY, camZ, naveY, naveZ) {
   return paraGraus(Math.atan2(camY - naveY, camZ - naveZ));
@@ -39,12 +42,14 @@ export function colunaRoll(rotZ) {
   return clamp(centro + Math.round(t * ROLL_QUADROS), 0, ATLAS_NAVE.colunasRoll - 1);
 }
 
+// Combina perspectiva, inclinacao lateral e velocidade para escolher o quadro.
 export function escolherQuadro({ camY, camZ, naveY, naveZ, vy, rotZ }) {
   const elevacao = elevacaoGeometrica(camY, camZ, naveY, naveZ) - GANHO_VELOCIDADE * vy;
   return { linha: linhaMaisProxima(elevacao), coluna: colunaRoll(rotZ), elevacao };
 }
 
 // Guarda a velocidade vertical suavizada da nave entre os quadros.
+// O limite evita que um teletransporte de respawn altere a animacao da nave.
 export class EstadoVista {
   constructor() { this.ultimoY = null; this.vy = 0; }
   atualizar(naveY, delta) {

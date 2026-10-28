@@ -1,4 +1,6 @@
-import { escolherQuadro, EstadoVista, colunaRoll, elevacaoGeometrica } from '../javascript/nave_vista.js';
+// Teste da matriz visual da nave e da suavizacao de velocidade vertical.
+// Rode com: node ferramentas/testar_vista.mjs
+import { escolherQuadro, EstadoVista } from '../javascript/nave_vista.js';
 import { ATLAS_NAVE as A } from '../javascript/nave_atlas.js';
 const cam = { y: 4, z: 16 }, naveZ = 7;
 const cenarios = [
@@ -17,7 +19,7 @@ const saida = cenarios.map(([nome, y, vy, rotZ]) => {
   const q = escolherQuadro({ camY: cam.y, camZ: cam.z, naveY: y, naveZ, vy, rotZ });
   return { nome, y, vy, rotZ, linha: q.linha, coluna: q.coluna, elevacao: +q.elevacao.toFixed(1), elevLinha: A.elevacoes[q.linha] };
 });
-// verificacoes
+// ---- Verificacoes da grade e da perspectiva -------------------------------
 const falhas = [];
 for (const s of saida) {
   if (s.linha < 0 || s.linha >= A.grade || s.coluna < 0 || s.coluna >= A.colunasRoll) falhas.push('fora da grade: ' + s.nome);
@@ -32,7 +34,8 @@ if (!(por('subindo rapido').elevLinha < por('repouso').elevLinha)) falhas.push('
 if (!(por('descendo rapido').elevLinha > por('repouso').elevLinha)) falhas.push('descer deveria aumentar a elevacao');
 if (por('indo para a direita').coluna !== 6) falhas.push('direita deveria ser coluna 6');
 if (por('subindo + esquerda').coluna !== 0) falhas.push('esquerda deveria ser coluna 0');
-// estado: ignora o salto do respawn
+// ---- Verificacao do estado suavizado ---------------------------------------
+// O salto do respawn nao pode virar uma velocidade visual falsa.
 const e = new EstadoVista(); e.atualizar(5, .016); let vy = e.atualizar(0, .016);
 if (Math.abs(vy) > 2) falhas.push('respawn nao deveria virar velocidade alta: ' + vy);
 // estado: convergencia para a velocidade real

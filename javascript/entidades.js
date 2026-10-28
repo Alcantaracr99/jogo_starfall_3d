@@ -1,7 +1,11 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-// Modelos geometricos funcionais usados pelo jogador, inimigos e mira.
-export function createPlayerShip() {
+// Modelos geometricos de reserva usados enquanto os sprites carregam ou quando falham.
+
+// ---------------------------------------------------------------------------
+// Nave do jogador
+// ---------------------------------------------------------------------------
+export function criarNaveJogador() {
   const ship = new THREE.Group();
   const silver = new THREE.MeshStandardMaterial({ color: 0xd9f5ff, metalness: .95, roughness: .14, emissive: 0x176785, emissiveIntensity: 1.1 });
   const shadow = new THREE.MeshStandardMaterial({ color: 0x102244, metalness: .85, roughness: .2, emissive: 0x071b4b, emissiveIntensity: 1.1 });
@@ -41,7 +45,10 @@ export function createPlayerShip() {
   return ship;
 }
 
-export function createEnemyShip(bossVariant = -1) {
+// ---------------------------------------------------------------------------
+// Nave inimiga e variantes de chefe
+// ---------------------------------------------------------------------------
+export function criarNaveInimiga(varianteChefe = -1) {
   const enemy = new THREE.Group();
   const bossPalettes = [
     { armor: 0x174d77, edge: 0x31e6ff, dark: 0x10283e, glow: 0x20cfff, core: 0x83f7ff },
@@ -50,7 +57,7 @@ export function createEnemyShip(bossVariant = -1) {
     { armor: 0x25532f, edge: 0x7dff74, dark: 0x18331e, glow: 0x4eff68, core: 0xc1ff8f },
     { armor: 0x67301d, edge: 0xff7652, dark: 0x3c1c19, glow: 0xff433e, core: 0xffc278 }
   ];
-  const palette = bossVariant >= 0 ? bossPalettes[bossVariant % bossPalettes.length] : null;
+  const palette = varianteChefe >= 0 ? bossPalettes[varianteChefe % bossPalettes.length] : null;
   const armor = new THREE.MeshStandardMaterial({ color: palette?.armor ?? 0x421c68, metalness: .9, roughness: .18, emissive: palette?.dark ?? 0x5e0d75, emissiveIntensity: 1.7 });
   const armorEdge = new THREE.MeshStandardMaterial({ color: palette?.edge ?? 0xff3f75, metalness: .75, roughness: .16, emissive: palette?.glow ?? 0xb90b61, emissiveIntensity: 1.6 });
   const armorDark = new THREE.MeshStandardMaterial({ color: palette?.dark ?? 0x16132f, metalness: .8, roughness: .22, emissive: palette ? palette.dark : 0x250d47, emissiveIntensity: 1.3 });
@@ -82,7 +89,7 @@ export function createEnemyShip(bossVariant = -1) {
   });
   const warningLight = new THREE.Mesh(new THREE.SphereGeometry(.08, 8, 6), orange);
   warningLight.position.set(0, .45, .65); enemy.add(warningLight);
-  if (bossVariant >= 0) {
+  if (varianteChefe >= 0) {
     const addWing = (geometry, material, position, rotation = [0, 0, 0], scale = [1, 1, 1]) => {
       const wing = new THREE.Mesh(geometry, material);
       wing.position.set(...position);
@@ -90,15 +97,16 @@ export function createEnemyShip(bossVariant = -1) {
       wing.scale.set(...scale);
       enemy.add(wing);
     };
-    if (bossVariant === 0) {
+    // Cada variante adiciona uma silhueta exclusiva sem alterar o casco comum.
+    if (varianteChefe === 0) {
       [-1, 1].forEach(direction => addWing(new THREE.ConeGeometry(.65, 2.1, 5), armorEdge, [direction * 1.65, .2, .2], [0, 0, direction * -.55]));
-    } else if (bossVariant === 1) {
+    } else if (varianteChefe === 1) {
       [-1, 1].forEach(direction => addWing(new THREE.OctahedronGeometry(.9, 0), armorEdge, [direction * 2.15, 0, .1], [0, 0, Math.PI / 4]));
       addWing(new THREE.TorusGeometry(1.15, .1, 8, 24), orange, [0, .1, -.25], [Math.PI / 2, 0, 0], [1.7, 1, 1]);
-    } else if (bossVariant === 2) {
+    } else if (varianteChefe === 2) {
       [-1, 1].forEach(direction => addWing(new THREE.BoxGeometry(1.35, .3, 2.1), armorEdge, [direction * 2, -.15, .3], [0, direction * .3, direction * -.2]));
       addWing(new THREE.OctahedronGeometry(.7, 1), orange, [0, .35, -.7]);
-    } else if (bossVariant === 3) {
+    } else if (varianteChefe === 3) {
       [-1, 1].forEach(direction => {
         addWing(new THREE.ConeGeometry(.38, 2.8, 4), armorEdge, [direction * 1.55, .15, .15], [0, 0, direction * -.8]);
         addWing(new THREE.TorusGeometry(.42, .09, 8, 18), orange, [direction * .6, .1, .25], [Math.PI / 2, 0, 0]);
@@ -114,13 +122,17 @@ export function createEnemyShip(bossVariant = -1) {
   return enemy;
 }
 
-export function createAimTarget() {
+// ---------------------------------------------------------------------------
+// Mira da nave
+// ---------------------------------------------------------------------------
+export function criarMira() {
   const target = new THREE.Group();
   const material = new THREE.MeshBasicMaterial({ color: 0x61f5ff, transparent: true, opacity: .9 });
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.95, .045, 8, 32), material);
   ring.rotation.x = Math.PI / 2; target.add(ring);
   const marks = new THREE.Group();
   const markGeometry = new THREE.BoxGeometry(.55, .045, .045);
+  // As marcas são espelhadas para formar os quatro indicadores da mira.
   [-1, 1].forEach(side => {
     const mark = new THREE.Mesh(markGeometry, material); mark.position.x = side * 2.25; marks.add(mark);
     const vertical = new THREE.Mesh(markGeometry, material); vertical.rotation.y = Math.PI / 2; vertical.position.z = side * 2.25; marks.add(vertical);

@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="css/jogo.css">
 </head>
 <body>
+  <!-- Camada de renderizacao 3D e interface sobreposta do jogo. -->
   <canvas id="game"></canvas>
   <div id="scene-transition"></div>
   <div id="hud">
@@ -31,6 +32,7 @@
     <div id="controls" class="hidden">WASD / SETAS: mover &nbsp; • &nbsp; ESPAÇO: disparar &nbsp; • &nbsp; X: laser &nbsp; • &nbsp; C: MÍSSEIS &nbsp; • &nbsp; ENTER: pausar</div>
   </div>
 
+  <!-- O modulo de entrada inicializa cena, campanha, controles e game loop. -->
   <script type="module" src="javascript/jogo.js"></script>
 </body>
 </html>

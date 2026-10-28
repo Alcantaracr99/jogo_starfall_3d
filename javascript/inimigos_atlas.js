@@ -1,4 +1,5 @@
 // Gerado por gerar_inimigos.py. Nao edite a mao: rode o script de novo.
+// Este arquivo e somente configuracao de leitura das folhas renderizadas.
 // elevacoes: graus com que a camera enxerga o inimigo (+ = camera acima, mostra o dorso).
 // azimutes: + = inimigo a direita da camera. unidades: lado do quadro em unidades do modelo.
 export const INIMIGOS_ATLAS = {

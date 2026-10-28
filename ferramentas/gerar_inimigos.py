@@ -16,13 +16,14 @@ Saidas (relativas a PROJ):
 """
 import itertools, json, math, os, sys
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter
 
 PROJ = os.environ.get("PROJ", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 IMG = os.path.join(PROJ, "img")
 JS = os.path.join(PROJ, "javascript")
-FERR = os.path.join(PROJ, "ferramentas")
-
+# ---------------------------------------------------------------------------
+# Configuracao da matriz de vistas e parametros de renderizacao.
+# ---------------------------------------------------------------------------
 FR = 384                 # lado do quadro final
 SS = 2                   # supersampling
 W = FR * SS
@@ -38,6 +39,7 @@ BOSS_AZIM = [-30, -20, -10, 0, 10, 20, 30]
 
 
 # ============================================================ utilidades
+# Conversoes de cor, interpolacao e matrizes usadas pelo renderizador.
 def hx(h):
     return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5)) if isinstance(h, str) else ((h >> 16) & 255, (h >> 8) & 255, h & 255)
 
@@ -89,6 +91,7 @@ def mkf(pts, ref, mat, part, lines=None):
 
 
 # ============================================================ primitivas (espaco local, como no Three.js)
+# Cada funcao retorna faces no mesmo sistema de coordenadas das entidades.js.
 # cada primitiva devolve lista de (pontos Nx3, ponto-de-referencia-interno)
 def cone(r, h, n, bands=6):
     out = []
@@ -442,50 +445,23 @@ def gerar_folha(nome, model, elevs, azims, arquivo):
     unidades = W * D_R / F        # lado do quadro em unidades do modelo (no plano da origem)
     print("%-8s escala %.3f  margem min %d px  unidades/quadro %.3f" % (nome, s, minm, unidades), flush=True)
     return dict(arquivo="../img/" + arquivo, quadro=FR, colunas=cols, linhas=rows,
-                elevacoes=elevs, azimutes=azims, unidades=round(unidades, 4)), sheet
+                elevacoes=elevs, azimutes=azims, unidades=round(unidades, 4))
 
 
 def main():
     os.makedirs(IMG, exist_ok=True)
     os.makedirs(JS, exist_ok=True)
-    os.makedirs(FERR, exist_ok=True)
     atlas = {}
-    sheets = {}
-    atlas["inimigo"], sheets["inimigo"] = gerar_folha("inimigo", Modelo(-1), ENEMY_ELEV, ENEMY_AZIM, "inimigo_vista.png")
+    atlas["inimigo"] = gerar_folha("inimigo", Modelo(-1), ENEMY_ELEV, ENEMY_AZIM, "inimigo_vista.png")
     atlas["chefes"] = []
     for v in range(5):
-        a, s = gerar_folha("chefe%d" % v, Modelo(v), BOSS_ELEV, BOSS_AZIM, "chefe%d_vista.png" % v)
+        a = gerar_folha("chefe%d" % v, Modelo(v), BOSS_ELEV, BOSS_AZIM, "chefe%d_vista.png" % v)
         atlas["chefes"].append(a)
-        sheets["chefe%d" % v] = s
     with open(os.path.join(JS, "inimigos_atlas.js"), "w", encoding="utf-8", newline="\r\n") as fh:
         fh.write("// Gerado por gerar_inimigos.py. Nao edite a mao: rode o script de novo.\n")
         fh.write("// elevacoes: graus com que a camera enxerga o inimigo (+ = camera acima, mostra o dorso).\n")
         fh.write("// azimutes: + = inimigo a direita da camera. unidades: lado do quadro em unidades do modelo.\n")
         fh.write("export const INIMIGOS_ATLAS = " + json.dumps(atlas, indent=2) + ";\n")
-
-    # preview: matriz do inimigo + quadro central de cada chefe
-    f = ImageFont.load_default()
-    cell = 200
-    sh = sheets["inimigo"]
-    pw = 110 + len(ENEMY_AZIM) * cell
-    ph = 24 + len(ENEMY_ELEV) * cell + 24 + 2 * 30 + (cell + 24)
-    bg = Image.new("RGBA", (pw, ph), (27, 27, 51, 255))
-    d = ImageDraw.Draw(bg)
-    for c, a in enumerate(ENEMY_AZIM):
-        d.text((110 + c * cell + 6, 6), "azim %+d" % a, fill=(190, 190, 230, 255), font=f)
-    for r, e in enumerate(ENEMY_ELEV):
-        d.text((8, 24 + r * cell + cell // 2), "elev %+d" % e, fill=(190, 190, 230, 255), font=f)
-        for c in range(len(ENEMY_AZIM)):
-            fr = sh.crop((c * FR, r * FR, (c + 1) * FR, (r + 1) * FR)).resize((cell, cell), Image.LANCZOS)
-            bg.alpha_composite(fr, (110 + c * cell, 24 + r * cell))
-    y0 = 24 + len(ENEMY_ELEV) * cell + 8
-    d.text((8, y0), "chefes 0-4 (elev 0, azim 0)", fill=(190, 190, 230, 255), font=f)
-    for v in range(5):
-        s = sheets["chefe%d" % v]
-        fr = s.crop((3 * FR, 1 * FR, 4 * FR, 2 * FR)).resize((cell, cell), Image.LANCZOS)
-        bg.alpha_composite(fr, (110 + v * cell, y0 + 14))
-    bg.convert("RGB").save(os.path.join(FERR, "preview_inimigos.png"))
-
 
 if __name__ == "__main__":
     main()

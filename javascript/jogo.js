@@ -1,10 +1,12 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { createEnvironment } from './ambiente.js';
-import { createAimTarget } from './entidades.js';
-import { createEnemyShip, updateEnemyView } from './inimigos_sprites.js';
-import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipExplosions } from './nave_principal.js';
+import { criarAmbiente } from './ambiente.js';
+import { criarMira } from './entidades.js';
+import { criarNaveInimiga, atualizarVistaInimigo } from './inimigos_sprites.js';
+import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualizarExplosoesNave } from './nave_principal.js';
 
-// Inicializacao do renderizador e da cena.
+// ---------------------------------------------------------------------------
+// Inicializacao da cena e estado persistente da campanha.
+// ---------------------------------------------------------------------------
     const canvas = document.querySelector('#game');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -17,10 +19,10 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
     const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 220);
     camera.position.set(0, 4, 16);
     camera.lookAt(0, 0, -20);
-    const { rift, riftHalfWidth, riftHalfHeight } = createEnvironment(scene, camera);
-    // Estado da campanha e elementos da interface.
-    const ship = createPlayerShip(); ship.scale.setScalar(.65); ship.position.set(0, 0, 7); ship.visible = false; scene.add(ship);
-    const target = createAimTarget(); ship.add(target); target.position.z = -10.5; target.scale.setScalar(.36);
+    const { rift, riftHalfWidth, riftHalfHeight } = criarAmbiente(scene, camera);
+    // Entidades ativas e parametros fixos de gameplay.
+    const ship = criarNaveJogador(); ship.scale.setScalar(.65); ship.position.set(0, 0, 7); ship.visible = false; scene.add(ship);
+    const target = criarMira(); ship.add(target); target.position.z = -10.5; target.scale.setScalar(.36);
     const keys = {}; const enemies = []; const shots = []; const enemyShots = []; const missiles = []; const effects = [];
     const levelTargets = [50, 70, 90, 110, 130, 150, 170, 190, 210, 230];
     const laserKillRequirement = 50, missileKillRequirement = 15;
@@ -75,6 +77,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
     const missileFill = document.querySelector('#missile-fill');
     const aim = document.querySelector('#aim');
     let shotSequence = 0;
+    // ---- Interface e audio -------------------------------------------------
     // Sons ficam na pasta snd, relativa a este modulo.
     const shotSound = new Audio(new URL('../snd/tiro.mp3', import.meta.url));
     const actionMusic = new Audio(new URL('../snd/musica-acao.mp3', import.meta.url));
@@ -93,6 +96,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
       const screenRay = new THREE.Vector3();
       const screenBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 
+      // ---- Limites de tela e movimentacao de chefes -------------------------
       function keepObjectOnScreen(position, paddingX, paddingY) {
         const corners = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
         screenBounds.minX = Infinity; screenBounds.maxX = -Infinity;
@@ -130,6 +134,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
       }
 
     // HUD, audio e controles de combate.
+    // ---- HUD, audio e disparos ---------------------------------------------
     function updateHud() {
       scoreElement.textContent = String(score).padStart(6, '0');
       objectiveCount.textContent = boss ? 'CHEFE' : `${Math.min(levelKills, levelTargets[currentLevel - 1])}/${levelTargets[currentLevel - 1]}`;
@@ -264,7 +269,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
       }
       updateHud();
     }
-    // Fluxo de abertura, mapa, niveis e chefes.
+    // ---- Fluxo de abertura, mapa, niveis e chefes ---------------------------
     function renderMap() {
       levelMap.innerHTML = levelTargets.map((target, index) => {
         const level = index + 1;
@@ -347,7 +352,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
       if (boss) return;
       const bossIndex = currentLevel / 2 - 1;
       const difficulty = bossDifficulty[bossIndex];
-      const mesh = createEnemyShip(bossIndex);
+      const mesh = criarNaveInimiga(bossIndex);
       mesh.scale.setScalar(bossScale);
       mesh.position.copy(getRiftSpawnPosition(14));
       scene.add(mesh);
@@ -382,7 +387,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
       missileCharge = Math.min(missileKillRequirement, missileCharge + 1);
       registerObjectiveKill();
     }
-    // Efeitos visuais, inimigos e dano ao jogador.
+    // ---- Efeitos visuais, inimigos e dano ao jogador ------------------------
     function explode(position, color = 0xff6a53, duration = .55) {
       const mesh = new THREE.Group();
       const core = new THREE.Mesh(new THREE.SphereGeometry(.3, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfff3a1, transparent: true }));
@@ -408,7 +413,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
       });
     }
     function spawnEnemy() {
-      const mesh = createEnemyShip();
+      const mesh = criarNaveInimiga();
       mesh.position.copy(getRiftSpawnPosition(7));
       scene.add(mesh);
       const routeAngle = Math.random() * Math.PI * 2;
@@ -437,7 +442,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
       updateHud();
       const terminalExplosion = missionLost || finalLife;
       explode(ship.position, terminalExplosion ? 0xff315f : 0x55eaff, terminalExplosion ? 2 : .55);
-      spawnShipExplosion(scene, ship.position, terminalExplosion);
+      gerarExplosaoNave(scene, ship.position, terminalExplosion);
       ship.visible = false;
       if (terminalExplosion) {
         endGame();
@@ -478,6 +483,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
         lossActions.classList.remove('hidden');
       }, 2000);
     }
+    // ---- Persistencia e controles de estado --------------------------------
     function saveCampaign(showStatus = true) {
       try {
         localStorage.setItem('starfall-campaign', JSON.stringify({ unlockedLevel, levelStars }));
@@ -557,6 +563,8 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
     document.addEventListener('visibilitychange', () => { if (document.hidden) clearKeys(); });
     addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
+    // ---- Game loop -----------------------------------------------------------
+    // A ordem abaixo e intencional: entrada, movimento, colisoes, efeitos e HUD.
     function animate() {
       requestAnimationFrame(animate); const delta = Math.min(clock.getDelta(), .05); const now = performance.now();
       rift.rotation.z = Math.sin(now * .00035) * .025;
@@ -582,7 +590,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
         ship.position.y += vertical * delta * 11;
         keepObjectOnScreen(ship.position, 1.2, .7);
         ship.rotation.z += (horizontal * -.08 - ship.rotation.z) * delta * 8;
-        updatePlayerShipView(ship, camera, delta);
+        atualizarVistaNaveJogador(ship, camera, delta);
         target.rotation.z -= delta * 1.6;
         target.getWorldPosition(aimPosition);
         aimPosition.project(camera);
@@ -654,7 +662,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
           enemy.mesh.position.x += (approachX + enemy.driftX) * delta;
           enemy.mesh.position.y += (approachY + enemy.driftY) * delta;
           keepObjectOnScreen(enemy.mesh.position, 1.7, .9);
-          updateEnemyView(enemy.mesh, camera);
+          atualizarVistaInimigo(enemy.mesh, camera);
           if (now > enemy.nextShot && enemy.mesh.position.z < ship.position.z - 4) { enemyFire(enemy); enemy.nextShot = now + 1000 + Math.random() * 1800; }
           if (enemy.mesh.position.distanceTo(ship.position) < 1.8 && ship.visible && !damageBlink) {
             scene.remove(enemy.mesh);
@@ -696,7 +704,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
             }
           }
           keepObjectOnScreen(boss.mesh.position, 1, .8);
-          updateEnemyView(boss.mesh, camera);
+          atualizarVistaInimigo(boss.mesh, camera);
           if (ship.visible && !damageBlink && boss.mesh.position.distanceTo(ship.position) < 2.2 * boss.mesh.scale.x) registerDirectImpact();
           if (now > boss.nextShot) { enemyFire(boss); boss.nextShot = now + boss.shotInterval; }
           if (now > boss.nextSpawn) { spawnEnemy(); boss.nextSpawn = now + boss.spawnInterval; }
@@ -729,7 +737,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
         }
       }
       updateEffects(delta);
-      updateShipExplosions(delta);
+      atualizarExplosoesNave(delta);
       renderer.render(scene, camera);
     }
     startMusic();

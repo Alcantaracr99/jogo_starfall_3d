@@ -15,6 +15,9 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageChops, ImageFilter, ImageFont
 
 OUT = os.environ.get("OUT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "saida"))
+# ---------------------------------------------------------------------------
+# Configuracao global do renderizador e dimensoes dos quadros.
+# ---------------------------------------------------------------------------
 FRAME = 512
 SS = 2                      # supersampling
 W = FRAME * SS
@@ -57,7 +60,7 @@ RIM = np.array([0.7, 0.55, 0.45]); RIM /= np.linalg.norm(RIM)
 BOUNCE = np.array([0.15, -0.7, -0.55]); BOUNCE /= np.linalg.norm(BOUNCE)
 
 
-# ---------------------------------------------------------------- malha
+# ---------------------------------------------------------------- malha geometrica
 class Face:
     __slots__ = ("pts", "n", "c", "mat", "group", "layer")
 

@@ -1,7 +1,10 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-// Cria o fundo espacial, iluminacao, planetas e fenda de origem das naves inimigas.
-export function createEnvironment(scene, camera) {
+// ---------------------------------------------------------------------------
+// Cenario espacial: fundo, iluminacao, estrelas, planetas e fenda dimensional.
+// ---------------------------------------------------------------------------
+export function criarAmbiente(scene, camera) {
+  // O fallback de cor garante um fundo valido mesmo se a imagem externa falhar.
   scene.fog = new THREE.FogExp2(0x02040c, 0.012);
   new THREE.TextureLoader().load(
     'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=2400&q=85',
@@ -28,6 +31,7 @@ export function createEnvironment(scene, camera) {
   starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
   starField.add(new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xb8e8ff, size: .16, transparent: true, opacity: .9 })));
 
+  // Os planetas sao elementos decorativos e ficam fora da area de combate.
   const planets = new THREE.Group();
   scene.add(planets);
   const planetStyles = [
@@ -75,6 +79,8 @@ export function createEnvironment(scene, camera) {
     upperEdge.push(new THREE.Vector3(x, riftHalfHeight * (taper + warp), 0));
     lowerEdge.push(new THREE.Vector3(x, -riftHalfHeight * (taper - warp), 0));
   }
+
+  // As camadas em profundidade criam a sensacao de tunel sem alterar a area de spawn.
   const makeTearShape = (widthScale, heightScale) => {
     const shape = new THREE.Shape();
     shape.moveTo(upperEdge[0].x * widthScale, upperEdge[0].y * heightScale);

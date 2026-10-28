@@ -1,10 +1,13 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { createEnemyShip as criarInimigoGeometrico } from './entidades.js';
+import { criarNaveInimiga as criarInimigoGeometrico } from './entidades.js';
 import { INIMIGOS_ATLAS } from './inimigos_atlas.js';
 import { escolherQuadroInimigo } from './inimigos_vista.js';
 
-// Inimigos e chefes baseados em matrizes de vistas (img/inimigo_vista.png e img/chefe0..4_vista.png).
-// createEnemyShip tem a mesma assinatura da versao geometrica: devolve um THREE.Group (frente em +Z) que
+// ---------------------------------------------------------------------------
+// Inimigos e chefes baseados em matrizes de vistas.
+// ---------------------------------------------------------------------------
+// As texturas sao compartilhadas por atlas para reduzir alocacoes na GPU.
+// criarNaveInimiga tem a mesma assinatura da versao geometrica: devolve um THREE.Group (frente em +Z) que
 // jogo.js posiciona, escala (chefe = 2x) e remove normalmente. A nave geometrica original continua como
 // reserva: aparece enquanto a imagem carrega ou se ela falhar.
 //
@@ -13,6 +16,7 @@ import { escolherQuadroInimigo } from './inimigos_vista.js';
 
 const folhas = new Map();
 
+// Carrega cada folha uma unica vez e conserva o fallback geometrico.
 function carregarFolha(chave, atlas) {
   let folha = folhas.get(chave);
   if (folha) return folha;
@@ -32,9 +36,9 @@ function carregarFolha(chave, atlas) {
   return folha;
 }
 
-export function createEnemyShip(bossVariant = -1) {
-  const chefe = bossVariant >= 0;
-  const indice = chefe ? bossVariant % INIMIGOS_ATLAS.chefes.length : 0;
+export function criarNaveInimiga(varianteChefe = -1) {
+  const chefe = varianteChefe >= 0;
+  const indice = chefe ? varianteChefe % INIMIGOS_ATLAS.chefes.length : 0;
   const atlas = chefe ? INIMIGOS_ATLAS.chefes[indice] : INIMIGOS_ATLAS.inimigo;
   const folha = carregarFolha(chefe ? `chefe${indice}` : 'inimigo', atlas);
 
@@ -47,15 +51,16 @@ export function createEnemyShip(bossVariant = -1) {
 
   let reserva = null;
   if (!folha.pronta) {
-    reserva = criarInimigoGeometrico(bossVariant);
+    reserva = criarInimigoGeometrico(varianteChefe);
     grupo.add(reserva);
   }
   grupo.userData.vista = { folha, atlas, quadro, reserva, linha: -1, coluna: -1 };
   return grupo;
 }
 
+// Atualiza orientacao e UVs apenas quando o quadro visual muda.
 // Chame uma vez por quadro para cada inimigo/chefe, depois de mover o objeto.
-export function updateEnemyView(grupo, camera) {
+export function atualizarVistaInimigo(grupo, camera) {
   const vista = grupo.userData.vista;
   if (!vista || !vista.folha.pronta) return;
   if (vista.reserva) {                       // a imagem ja carregou: troca a nave geometrica pelo quadro

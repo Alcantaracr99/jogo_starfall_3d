@@ -1,4 +1,7 @@
-// Logica pura (sem Three.js) que decide QUAL quadro da matriz de vistas mostrar para um inimigo ou chefe.
+// ---------------------------------------------------------------------------
+// Selecao pura do quadro visual de inimigos e chefes.
+// ---------------------------------------------------------------------------
+// Este modulo nao conhece a cena Three.js; recebe apenas coordenadas e o atlas.
 //
 // Os inimigos nunca giram no jogo (nao ha rotation nem lookAt): a ponta do casco (+Z) aponta sempre para a camera.
 // Entao a unica coisa que muda a aparencia e a posicao relativa a camera:
@@ -9,6 +12,7 @@
 
 const paraGraus = rad => rad * 180 / Math.PI;
 
+// Converte a posicao relativa em elevacao e azimute da vista da camera.
 export function elevacaoAzimute(cam, pos) {
   const dx = pos.x - cam.x;
   const dz = cam.z - pos.z;
@@ -26,6 +30,7 @@ export function indiceMaisProximo(lista, valor) {
   return melhor;
 }
 
+// Mapeia os angulos calculados para a linha e a coluna disponiveis no atlas.
 export function escolherQuadroInimigo(atlas, cam, pos) {
   const { elevacao, azimute } = elevacaoAzimute(cam, pos);
   return {

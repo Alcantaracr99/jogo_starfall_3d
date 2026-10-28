@@ -10,11 +10,14 @@ Usa o renderizador de gerar_spritesheet_nave.py (mesmo modelo, mesmo estilo).
 """
 import json, os, sys
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gerar_spritesheet_nave as g
 
+# ---------------------------------------------------------------------------
+# Configuracao da matriz e caminhos de saida.
+# ---------------------------------------------------------------------------
 PROJ = os.environ.get("PROJ", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # raiz do jogo (pasta acima de ferramentas/)
 IMG = os.path.join(PROJ, "img")
 JS = os.path.join(PROJ, "javascript")
@@ -31,6 +34,7 @@ MARGEM = 18  # px minimos de margem no quadro final (512)
 
 
 def render_frame(e, th, flame_phase=2):
+    # Renderiza uma vista da nave e seus efeitos de motor.
     hull, R = g.render_hull(roll=th, pitch=-e, yaw=-0.2 * th)
     fx = g.flames(R, flame_phase, "cruise", seed=7)
     fx = g.nav_lights(fx, R)
@@ -38,6 +42,7 @@ def render_frame(e, th, flame_phase=2):
 
 
 def extent(img):
+    # Calcula a maior distancia do conteudo ao centro do quadro.
     a = np.array(img)[..., 3]
     ys, xs = np.where(a > 8)
     c = g.W / 2
@@ -45,6 +50,7 @@ def extent(img):
 
 
 def main():
+    # Gera spritesheet, explosao, atlas e preview da nave.
     # passo 1: mede a extensao de cada linha na escala 1 e define a escala que cabe no quadro
     escalas = []
     for e in ELEV:
@@ -98,24 +104,6 @@ def main():
         fh.write("// escalas: fator de render de cada linha (o jogo compensa para a nave manter o mesmo tamanho).\n")
         fh.write("export const ATLAS_NAVE = " + json.dumps(atlas, indent=2) + ";\n")
     print("larguraRelativa", atlas["larguraRelativa"])
-
-    # preview rotulado da matriz
-    P = 2048
-    cell = P // GRID
-    bg = Image.new("RGBA", (P + 150, P + 40), g.hx("#1B1B33") + (255,))
-    bg.alpha_composite(sheet.resize((P, P), Image.LANCZOS), (150, 40))
-    d = ImageDraw.Draw(bg)
-    f = ImageFont.load_default()
-    for r, e in enumerate(ELEV):
-        d.text((8, 40 + r * cell + cell // 2 - 10), "elev %+d" % e, fill=(190, 190, 230, 255), font=f)
-        d.text((8, 40 + r * cell + cell // 2 + 4), "%s" % ("dorso" if e > 0 else ("de tras" if e == 0 else "barriga")),
-               fill=(150, 150, 200, 255), font=f)
-    for c, th in enumerate(ROLLS):
-        lab = "esq %d" % th if th > 0 else ("dir %d" % -th if th < 0 else "neutro")
-        d.text((150 + c * cell + 6, 10), lab, fill=(190, 190, 230, 255), font=f)
-    os.makedirs(os.path.join(PROJ, "ferramentas"), exist_ok=True)
-    bg.convert("RGB").save(os.path.join(PROJ, "ferramentas", "preview_matriz_vista.png"))
-
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,7 @@
-// Teste da logica de escolha de quadro dos inimigos/chefes. Rode com: node ferramentas/testar_inimigos.mjs
-import { escolherQuadroInimigo, elevacaoAzimute } from '../javascript/inimigos_vista.js';
+// Teste da logica de escolha de quadro dos inimigos/chefes.
+// Rode com: node ferramentas/testar_inimigos.mjs
+// Os cenarios validam limites, perspectiva e simetria sem abrir um navegador.
+import { escolherQuadroInimigo } from '../javascript/inimigos_vista.js';
 import { INIMIGOS_ATLAS as A } from '../javascript/inimigos_atlas.js';
 
 const cam = { x: 0, y: 4, z: 16 };
@@ -15,6 +17,8 @@ const cenarios = [
   ['chefe no destino, alto e a direita',   'chefe', 9, 8.5, -48],
   ['chefe entrando (spawn)',               'chefe', -30, -4.7, -48],
 ];
+
+// Gera um relatorio legivel para facilitar a deteccao de uma matriz incorreta.
 const saida = cenarios.map(([nome, tipo, x, y, z]) => {
   const atlas = tipo === 'chefe' ? A.chefes[0] : inimigo;
   const q = escolherQuadroInimigo(atlas, cam, { x, y, z });
