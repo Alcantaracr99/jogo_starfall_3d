@@ -19,7 +19,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
     camera.lookAt(0, 0, -20);
     const { rift, riftHalfWidth, riftHalfHeight } = createEnvironment(scene, camera);
     // Estado da campanha e elementos da interface.
-    const ship = createPlayerShip(); ship.scale.setScalar(.65); ship.position.set(0, 0, 7); scene.add(ship);
+    const ship = createPlayerShip(); ship.scale.setScalar(.65); ship.position.set(0, 0, 7); ship.visible = false; scene.add(ship);
     const target = createAimTarget(); ship.add(target); target.position.z = -10.5; target.scale.setScalar(.36);
     const keys = {}; const enemies = []; const shots = []; const enemyShots = []; const missiles = []; const effects = [];
     const levelTargets = [50, 70, 90, 110, 130, 150, 170, 190, 210, 230];
@@ -27,7 +27,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
     const smallEnemyMinSpeed = 8, smallEnemyMaxSpeed = 15;
     const enemyBaseSpeed = (smallEnemyMinSpeed + smallEnemyMaxSpeed) / 2;
     const bossScale = 2;
-    const enemyShotHitRadius = .9;
+    const enemyShotHitRadius = 1.4;
     const bossShotHitRadius = 1.2;
     const bossDifficulty = [
       { health: 30, speedMultiplier: 3.75, shotInterval: 1000, spawnInterval: 2100 },
@@ -411,11 +411,15 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
       const mesh = createEnemyShip();
       mesh.position.copy(getRiftSpawnPosition(7));
       scene.add(mesh);
+      const routeAngle = Math.random() * Math.PI * 2;
+      const routeDistance = 2.2 + Math.random() * .8;
       enemies.push({
         mesh,
         speed: smallEnemyMinSpeed + Math.random() * (smallEnemyMaxSpeed - smallEnemyMinSpeed),
         driftX: (Math.random() - .5) * 3.2,
         driftY: (Math.random() - .5) * 2.6,
+        routeOffsetX: Math.cos(routeAngle) * routeDistance,
+        routeOffsetY: Math.sin(routeAngle) * routeDistance,
         nextDrift: performance.now() + 350 + Math.random() * 500,
         nextShot: performance.now() + 900 + Math.random() * 1500
       });
@@ -643,8 +647,10 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
             enemy.driftY = THREE.MathUtils.clamp(enemy.driftY + (Math.random() - .5) * 2, -2.2, 2.2);
             enemy.nextDrift = now + 300 + Math.random() * 700;
           }
-          const approachX = (ship.position.x - enemy.mesh.position.x) * .22;
-          const approachY = (ship.position.y - enemy.mesh.position.y) * .22;
+          const routeTargetX = ship.position.x + enemy.routeOffsetX;
+          const routeTargetY = ship.position.y + enemy.routeOffsetY;
+          const approachX = (routeTargetX - enemy.mesh.position.x) * .34;
+          const approachY = (routeTargetY - enemy.mesh.position.y) * .34;
           enemy.mesh.position.x += (approachX + enemy.driftX) * delta;
           enemy.mesh.position.y += (approachY + enemy.driftY) * delta;
           keepObjectOnScreen(enemy.mesh.position, 1.7, .9);
