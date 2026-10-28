@@ -613,9 +613,16 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       if (event.code === 'KeyX') fireLaser();
       if (event.key.toLowerCase() === 'c') fireMissileBarrage();
     });
+    addEventListener('mousedown', event => {
+      if (event.button !== 0 || !running || paused) return;
+      keys.mouse = true;
+      event.preventDefault();
+      fire();
+    });
     addEventListener('pointerdown', startMusic, { once: true });
     addEventListener('keydown', startMusic, { once: true });
     addEventListener('keyup', event => { keys[event.key.toLowerCase()] = false; if (event.code === 'Space') keys.space = false; });
+    addEventListener('mouseup', event => { if (event.button === 0) keys.mouse = false; });
     addEventListener('blur', clearKeys);
     document.addEventListener('visibilitychange', () => { if (document.hidden) clearKeys(); });
     addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
@@ -626,7 +633,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       requestAnimationFrame(animate); const delta = Math.min(clock.getDelta(), .05); const now = performance.now();
       rift.rotation.z = Math.sin(now * .00035) * .025;
       if (running && !paused) {
-        if (keys.space) fire();
+        if (keys.space || keys.mouse) fire();
         const horizontal = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
         const vertical = (keys.arrowup || keys.w ? 1 : 0) - (keys.arrowdown || keys.s ? 1 : 0);
         if (damageBlink) {
