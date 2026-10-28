@@ -606,11 +606,13 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
         target.userData.material.color.set(alignedEnemy ? 0xff315f : 0x61f5ff);
         target.userData.material.opacity = alignedEnemy ? .98 : .72;
         if (!boss && levelKills < levelTargets[currentLevel - 1] && now - lastSpawn > Math.max(360, 850 - score * 2)) { spawnEnemy(); lastSpawn = now; }
-        shots.forEach((shot, index) => {
+        for (let index = shots.length - 1; index >= 0; index--) {
+          const shot = shots[index];
           shot.mesh.position.addScaledVector(shot.direction, shot.speed * delta);
           if (shot.mesh.position.z < -65) { scene.remove(shot.mesh); shots.splice(index, 1); }
-        });
-        missiles.forEach((missile, missileIndex) => {
+        }
+        for (let missileIndex = missiles.length - 1; missileIndex >= 0; missileIndex--) {
+          const missile = missiles[missileIndex];
           missile.life -= delta;
           const targetIsActive = missile.target && missile.target.mesh.parent;
           if (!targetIsActive) {
@@ -642,13 +644,16 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
               }
             }
             scene.remove(missile.mesh);
+            if (!running) break;
             missiles.splice(missileIndex, 1);
           } else if (missile.life <= 0 || missile.mesh.position.z < -65) {
             scene.remove(missile.mesh);
             missiles.splice(missileIndex, 1);
           }
-        });
-        enemies.forEach((enemy, enemyIndex) => {
+        }
+        for (let enemyIndex = enemies.length - 1; enemyIndex >= 0; enemyIndex--) {
+          const enemy = enemies[enemyIndex];
+          let enemyRemoved = false;
           enemy.mesh.position.z += enemy.speed * delta;
           if (now > enemy.nextDrift) {
             enemy.driftX = THREE.MathUtils.clamp(enemy.driftX + (Math.random() - .5) * 2.4, -2.8, 2.8);
@@ -668,7 +673,11 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
             scene.remove(enemy.mesh);
             enemies.splice(enemyIndex, 1);
             registerDirectImpact();
-            return;
+            enemyRemoved = true;
+          }
+          if (enemyRemoved) {
+            if (!running) break;
+            continue;
           }
           for (let shotIndex = shots.length - 1; shotIndex >= 0; shotIndex--) {
             const shot = shots[shotIndex];
@@ -681,11 +690,14 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
               score += 10;
               registerKill();
               updateHud();
+              enemyRemoved = true;
               break;
             }
           }
+          if (!running) break;
+          if (enemyRemoved) continue;
           if (enemy.mesh.position.z > 14) { scene.remove(enemy.mesh); enemies.splice(enemyIndex, 1); }
-        });
+        }
         if (boss) {
           if (!boss.moveTarget && now > boss.nextMove) {
             boss.moveTarget = chooseBossDestination(boss.mesh);
@@ -708,15 +720,18 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
           if (ship.visible && !damageBlink && boss.mesh.position.distanceTo(ship.position) < 2.2 * boss.mesh.scale.x) registerDirectImpact();
           if (now > boss.nextShot) { enemyFire(boss); boss.nextShot = now + boss.shotInterval; }
           if (now > boss.nextSpawn) { spawnEnemy(); boss.nextSpawn = now + boss.spawnInterval; }
-          shots.forEach((shot, shotIndex) => {
+          for (let shotIndex = shots.length - 1; shotIndex >= 0; shotIndex--) {
+            const shot = shots[shotIndex];
             if (boss && boss.mesh.position.distanceTo(shot.mesh.position) < bossShotHitRadius * boss.mesh.scale.x) {
               boss.health--; scene.remove(shot.mesh); shots.splice(shotIndex, 1); explode(boss.mesh.position, 0xfff36b);
               bossFill.style.width = `${Math.max(0, boss.health / boss.maxHealth * 100)}%`;
               if (boss.health <= 0) { score += 100; explode(boss.mesh.position, 0xff477e, 2.5); completeLevel(); }
             }
-          });
+            if (!running) break;
+          }
         }
-        enemyShots.forEach((shot, shotIndex) => {
+        for (let shotIndex = enemyShots.length - 1; shotIndex >= 0; shotIndex--) {
+          const shot = enemyShots[shotIndex];
           shot.mesh.position.z += shot.speed * delta;
           if (ship.visible && !damageBlink && shot.mesh.position.distanceTo(ship.position) < 1.15) {
             scene.remove(shot.mesh);
@@ -728,7 +743,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
           } else if (shot.mesh.position.z > 14) {
             scene.remove(shot.mesh); enemyShots.splice(shotIndex, 1);
           }
-        });
+        }
         if (laser) {
           laser.life -= delta;
           const opacity = Math.max(0, laser.life / .42);
