@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { criarAmbiente } from './ambiente.js';
 import { criarMira } from './entidades.js';
-import { criarNaveInimiga, atualizarVistaInimigo } from './inimigos_sprites.js';
+import { criarNaveInimiga, atualizarVistaInimigo, liberarNaveInimiga } from './inimigos_sprites.js';
 import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualizarExplosoesNave } from './nave_principal.js';
 
 // ---------------------------------------------------------------------------
@@ -38,16 +38,44 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       { health: 60, speedMultiplier: 6, shotInterval: 700, spawnInterval: 1500 },
       { health: 70, speedMultiplier: 6.75, shotInterval: 600, spawnInterval: 1300 }
     ];
-    const savedCampaign = JSON.parse(localStorage.getItem('starfall-campaign') || 'null');
-    if (savedCampaign !== null && (typeof savedCampaign !== 'object' || Array.isArray(savedCampaign) || !Number.isInteger(savedCampaign.unlockedLevel) || savedCampaign.unlockedLevel < 1 || savedCampaign.unlockedLevel > levelTargets.length)) {
-      throw new Error('O progresso salvo da campanha est\u00e1 inv\u00e1lido.');
+    function lerDadosSalvos(chave, padrao) {
+      const conteudo = localStorage.getItem(chave);
+      if (conteudo === null) return padrao;
+      try {
+        return JSON.parse(conteudo);
+      } catch (error) {
+        console.warn(`Starfall: dados salvos invalidos em ${chave}; usando o valor padrao.`, error);
+        localStorage.removeItem(chave);
+        return padrao;
+      }
     }
-    const levelStars = savedCampaign ? savedCampaign.levelStars : JSON.parse(localStorage.getItem('starfall-level-stars') || '{}');
-    if (!levelStars || typeof levelStars !== 'object' || Array.isArray(levelStars) || Object.entries(levelStars).some(([level, stars]) => !Number.isInteger(Number(level)) || Number(level) < 1 || Number(level) > levelTargets.length || !Number.isInteger(stars) || stars < 0 || stars > 3)) {
-      throw new Error('O registro de estrelas das miss\u00f5es est\u00e1 inv\u00e1lido.');
+    const campanhaSalva = lerDadosSalvos('starfall-campaign', null);
+    const campanhaValida = campanhaSalva === null || (
+      typeof campanhaSalva === 'object' &&
+      !Array.isArray(campanhaSalva) &&
+      Number.isInteger(campanhaSalva.unlockedLevel) &&
+      campanhaSalva.unlockedLevel >= 1 &&
+      campanhaSalva.unlockedLevel <= levelTargets.length
+    );
+    if (!campanhaValida) {
+      console.warn('Starfall: progresso salvo invalido; iniciando uma campanha nova.');
+      localStorage.removeItem('starfall-campaign');
+    }
+    const savedCampaign = campanhaValida ? campanhaSalva : null;
+    let levelStars = savedCampaign ? savedCampaign.levelStars : lerDadosSalvos('starfall-level-stars', {});
+    const estrelasValidas = levelStars && typeof levelStars === 'object' && !Array.isArray(levelStars) &&
+      Object.entries(levelStars).every(([level, stars]) =>
+        Number.isInteger(Number(level)) && Number(level) >= 1 && Number(level) <= levelTargets.length &&
+        Number.isInteger(stars) && stars >= 0 && stars <= 3
+      );
+    if (!estrelasValidas) {
+      console.warn('Starfall: registro de estrelas invalido; iniciando as missoes sem estrelas salvas.');
+      localStorage.removeItem('starfall-level-stars');
+      levelStars = {};
     }
     let score = 0, lives = 3, hitsTaken = 0, missionShotHits = 0, directImpacts = 0, laserCharge = 0, missileCharge = 0, levelKills = 0, currentLevel = 1, unlockedLevel = savedCampaign ? savedCampaign.unlockedLevel : 1, running = false, paused = false, lastSpawn = 0, lastShot = 0, laser = null, boss = null, damageBlink = null;
     let transitionTimer = null;
+    let respawnTimer = null;
     const clock = new THREE.Clock();
     const scoreElement = document.querySelector('#score');
     const objectiveCount = document.querySelector('#objective-count');
@@ -261,10 +289,11 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
         const inHorizon = enemy.mesh.position.z < ship.position.z && enemy.mesh.position.z > -65;
         if (inHorizon) {
           explode(enemy.mesh.position, 0xfff36b);
-          scene.remove(enemy.mesh);
+          removerNaveInimiga(enemy.mesh);
           enemies.splice(index, 1);
           score += 10;
           registerObjectiveKill();
+          if (!running) break;
         }
       }
       updateHud();
@@ -308,13 +337,14 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       }, delay);
     }
     function clearBattlefield(keepEffects = false) {
-      enemies.splice(0).forEach(item => scene.remove(item.mesh));
-      shots.splice(0).forEach(item => scene.remove(item.mesh));
-      enemyShots.splice(0).forEach(item => scene.remove(item.mesh));
-      missiles.splice(0).forEach(item => scene.remove(item.mesh));
-      if (!keepEffects) effects.splice(0).forEach(item => scene.remove(item.mesh));
-      if (laser) { scene.remove(laser.mesh); laser = null; }
-      if (boss) { scene.remove(boss.mesh); boss = null; }
+      if (respawnTimer) { clearTimeout(respawnTimer); respawnTimer = null; }
+      enemies.splice(0).forEach(item => removerNaveInimiga(item.mesh));
+      shots.splice(0).forEach(item => removerObjeto(item.mesh));
+      enemyShots.splice(0).forEach(item => removerObjeto(item.mesh));
+      missiles.splice(0).forEach(item => removerObjeto(item.mesh));
+      if (!keepEffects) effects.splice(0).forEach(item => removerObjeto(item.mesh));
+      if (laser) { removerObjeto(laser.mesh); laser = null; }
+      if (boss) { removerNaveInimiga(boss.mesh); boss = null; }
     }
     function startLevel(level) {
       if (transitionTimer) clearTimeout(transitionTimer);
@@ -403,14 +433,39 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       mesh.position.copy(position); scene.add(mesh); effects.push({ mesh, life: duration, max: duration });
       playExplosionSound();
     }
-    function updateEffects(delta) {
-      effects.forEach((effect, index) => {
+    function liberarRecursosObjeto(objeto) {
+      objeto.traverse(parte => {
+        parte.geometry?.dispose();
+        const materiais = Array.isArray(parte.material) ? parte.material : [parte.material];
+        materiais.filter(Boolean).forEach(material => {
+          material.map?.dispose();
+          material.dispose();
+        });
+      });
+    }
+
+    function removerObjeto(objeto) {
+      scene.remove(objeto);
+      liberarRecursosObjeto(objeto);
+    }
+
+    function removerNaveInimiga(mesh) {
+      scene.remove(mesh);
+      liberarNaveInimiga(mesh);
+    }
+
+    function atualizarEfeitos(delta) {
+      for (let index = effects.length - 1; index >= 0; index--) {
+        const effect = effects[index];
         effect.life -= delta;
         const scale = 1 + (1 - effect.life / effect.max) * 5;
         effect.mesh.scale.setScalar(scale);
         effect.mesh.traverse(child => { if (child.material) child.material.opacity = Math.max(0, effect.life / effect.max); });
-        if (effect.life <= 0) { scene.remove(effect.mesh); effects.splice(index, 1); }
-      });
+        if (effect.life <= 0) {
+          removerObjeto(effect.mesh);
+          effects.splice(index, 1);
+        }
+      }
     }
     function spawnEnemy() {
       const mesh = criarNaveInimiga();
@@ -448,7 +503,8 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
         endGame();
         return;
       }
-      setTimeout(() => {
+      respawnTimer = setTimeout(() => {
+        respawnTimer = null;
         if (running && lives > 0) { ship.visible = true; ship.position.set(0, 0, 7); }
       }, 550);
     }
@@ -460,6 +516,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
     function endGame() {
       if (!running) return;
       running = false;
+      if (respawnTimer) { clearTimeout(respawnTimer); respawnTimer = null; }
       paused = false;
       clearKeys();
       pauseMenu.classList.add('hidden');
@@ -609,7 +666,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
         for (let index = shots.length - 1; index >= 0; index--) {
           const shot = shots[index];
           shot.mesh.position.addScaledVector(shot.direction, shot.speed * delta);
-          if (shot.mesh.position.z < -65) { scene.remove(shot.mesh); shots.splice(index, 1); }
+          if (shot.mesh.position.z < -65) { removerObjeto(shot.mesh); shots.splice(index, 1); }
         }
         for (let missileIndex = missiles.length - 1; missileIndex >= 0; missileIndex--) {
           const missile = missiles[missileIndex];
@@ -636,18 +693,18 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
               const enemyIndex = enemies.indexOf(missile.target);
               if (enemyIndex >= 0) {
                 explode(missile.target.mesh.position, 0xffb347);
-                scene.remove(missile.target.mesh);
+                removerNaveInimiga(missile.target.mesh);
                 enemies.splice(enemyIndex, 1);
                 score += 10;
                 registerObjectiveKill();
                 updateHud();
               }
             }
-            scene.remove(missile.mesh);
+            removerObjeto(missile.mesh);
             if (!running) break;
             missiles.splice(missileIndex, 1);
           } else if (missile.life <= 0 || missile.mesh.position.z < -65) {
-            scene.remove(missile.mesh);
+            removerObjeto(missile.mesh);
             missiles.splice(missileIndex, 1);
           }
         }
@@ -670,7 +727,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
           atualizarVistaInimigo(enemy.mesh, camera);
           if (now > enemy.nextShot && enemy.mesh.position.z < ship.position.z - 4) { enemyFire(enemy); enemy.nextShot = now + 1000 + Math.random() * 1800; }
           if (enemy.mesh.position.distanceTo(ship.position) < 1.8 && ship.visible && !damageBlink) {
-            scene.remove(enemy.mesh);
+            removerNaveInimiga(enemy.mesh);
             enemies.splice(enemyIndex, 1);
             registerDirectImpact();
             enemyRemoved = true;
@@ -683,8 +740,8 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
             const shot = shots[shotIndex];
             if (enemy.mesh.position.distanceTo(shot.mesh.position) < enemyShotHitRadius) {
               explode(enemy.mesh.position);
-              scene.remove(enemy.mesh);
-              scene.remove(shot.mesh);
+              removerNaveInimiga(enemy.mesh);
+              removerObjeto(shot.mesh);
               enemies.splice(enemyIndex, 1);
               shots.splice(shotIndex, 1);
               score += 10;
@@ -696,7 +753,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
           }
           if (!running) break;
           if (enemyRemoved) continue;
-          if (enemy.mesh.position.z > 14) { scene.remove(enemy.mesh); enemies.splice(enemyIndex, 1); }
+          if (enemy.mesh.position.z > 14) { removerNaveInimiga(enemy.mesh); enemies.splice(enemyIndex, 1); }
         }
         if (boss) {
           if (!boss.moveTarget && now > boss.nextMove) {
@@ -723,7 +780,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
           for (let shotIndex = shots.length - 1; shotIndex >= 0; shotIndex--) {
             const shot = shots[shotIndex];
             if (boss && boss.mesh.position.distanceTo(shot.mesh.position) < bossShotHitRadius * boss.mesh.scale.x) {
-              boss.health--; scene.remove(shot.mesh); shots.splice(shotIndex, 1); explode(boss.mesh.position, 0xfff36b);
+              boss.health--; removerObjeto(shot.mesh); shots.splice(shotIndex, 1); explode(boss.mesh.position, 0xfff36b);
               bossFill.style.width = `${Math.max(0, boss.health / boss.maxHealth * 100)}%`;
               if (boss.health <= 0) { score += 100; explode(boss.mesh.position, 0xff477e, 2.5); completeLevel(); }
             }
@@ -734,24 +791,24 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
           const shot = enemyShots[shotIndex];
           shot.mesh.position.z += shot.speed * delta;
           if (ship.visible && !damageBlink && shot.mesh.position.distanceTo(ship.position) < 1.15) {
-            scene.remove(shot.mesh);
+            removerObjeto(shot.mesh);
             enemyShots.splice(shotIndex, 1);
             hitsTaken++;
             missionShotHits++;
             startDamageBlink(hitsTaken >= 3);
             explode(ship.position, 0xff315f);
           } else if (shot.mesh.position.z > 14) {
-            scene.remove(shot.mesh); enemyShots.splice(shotIndex, 1);
+            removerObjeto(shot.mesh); enemyShots.splice(shotIndex, 1);
           }
         }
         if (laser) {
           laser.life -= delta;
           const opacity = Math.max(0, laser.life / .42);
           laser.mesh.children.forEach(segment => { segment.material.opacity = opacity; });
-          if (laser.life <= 0) { scene.remove(laser.mesh); laser = null; }
+          if (laser.life <= 0) { removerObjeto(laser.mesh); laser = null; }
         }
       }
-      updateEffects(delta);
+      atualizarEfeitos(delta);
       atualizarExplosoesNave(delta);
       renderer.render(scene, camera);
     }

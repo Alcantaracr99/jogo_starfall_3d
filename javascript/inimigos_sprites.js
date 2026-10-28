@@ -24,14 +24,13 @@ function carregarFolha(chave, atlas) {
     folha.material.needsUpdate = true;
     folha.pronta = true;
   }, undefined, () => {
-    folha.falhou = true;
     console.warn(`Starfall: nao foi possivel carregar ${atlas.arquivo}; mantendo a nave geometrica.`);
   });
   textura.colorSpace = THREE.SRGBColorSpace;
   textura.minFilter = THREE.LinearMipmapLinearFilter;   // inimigos distantes ficam pequenos na tela
   textura.magFilter = THREE.LinearFilter;
   const material = new THREE.MeshBasicMaterial({ map: textura, transparent: true, toneMapped: false, depthWrite: false });
-  folha = { atlas, textura, material, geometria: new THREE.PlaneGeometry(1, 1), pronta: false, falhou: false };
+  folha = { atlas, material, geometria: new THREE.PlaneGeometry(1, 1), pronta: false };
   folhas.set(chave, folha);
   return folha;
 }
@@ -47,8 +46,6 @@ export function criarNaveInimiga(varianteChefe = -1) {
   quadro.scale.set(atlas.unidades, atlas.unidades, 1);
   quadro.visible = false;
   grupo.add(quadro);
-  grupo.addEventListener('removed', () => quadro.geometry.dispose());   // libera o plano deste inimigo
-
   let reserva = null;
   if (!folha.pronta) {
     reserva = criarInimigoGeometrico(varianteChefe);
@@ -58,6 +55,22 @@ export function criarNaveInimiga(varianteChefe = -1) {
   return grupo;
 }
 
+function liberarRecursosGeometricos(objeto) {
+  objeto.traverse(parte => {
+    parte.geometry?.dispose();
+    const materiais = Array.isArray(parte.material) ? parte.material : [parte.material];
+    materiais.filter(Boolean).forEach(material => material.dispose());
+  });
+}
+
+// Libera apenas recursos exclusivos da instancia; atlas, textura e material sao compartilhados.
+export function liberarNaveInimiga(grupo) {
+  const vista = grupo.userData.vista;
+  if (!vista) return;
+  vista.quadro.geometry.dispose();
+  if (vista.reserva) liberarRecursosGeometricos(vista.reserva);
+}
+
 // Atualiza orientacao e UVs apenas quando o quadro visual muda.
 // Chame uma vez por quadro para cada inimigo/chefe, depois de mover o objeto.
 export function atualizarVistaInimigo(grupo, camera) {
@@ -65,6 +78,7 @@ export function atualizarVistaInimigo(grupo, camera) {
   if (!vista || !vista.folha.pronta) return;
   if (vista.reserva) {                       // a imagem ja carregou: troca a nave geometrica pelo quadro
     grupo.remove(vista.reserva);
+    liberarRecursosGeometricos(vista.reserva);
     vista.reserva = null;
   }
   vista.quadro.quaternion.copy(camera.quaternion);   // o quadro sempre encara a camera

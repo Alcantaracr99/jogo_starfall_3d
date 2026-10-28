@@ -2,7 +2,7 @@
 """
 Spritesheets das naves inimigas e dos 5 chefes do Starfall 3D.
 
-Os modelos sao portados de entidades.js (createEnemyShip): cada cone, esfera, toro, caixa e extrusao
+Os modelos sao portados de entidades.js (criarNaveInimiga): cada cone, esfera, toro, caixa e extrusao
 com a MESMA posicao, rotacao (Euler XYZ), escala e parametros do codigo. Sem rotacao em jogo: a ponta do
 casco (+Z) sempre aponta para a camera, entao so a posicao relativa a camera muda a vista.
 
@@ -250,7 +250,7 @@ def extrude(shape, depth):
     return out
 
 
-# ============================================================ montagem do modelo (espelha createEnemyShip)
+# ============================================================ montagem do modelo (espelha criarNaveInimiga)
 class Modelo:
     def __init__(self, variante):
         self.faces, self.glows = [], []

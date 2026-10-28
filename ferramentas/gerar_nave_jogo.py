@@ -50,7 +50,7 @@ def extent(img):
 
 
 def main():
-    # Gera spritesheet, explosao, atlas e preview da nave.
+    # Gera o spritesheet, a explosao e o atlas usados pela nave.
     # passo 1: mede a extensao de cada linha na escala 1 e define a escala que cabe no quadro
     escalas = []
     for e in ELEV:
