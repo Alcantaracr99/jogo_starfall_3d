@@ -27,7 +27,7 @@ import { createPlayerShip, updatePlayerShipView, spawnShipExplosion, updateShipE
     const smallEnemyMinSpeed = 8, smallEnemyMaxSpeed = 15;
     const enemyBaseSpeed = (smallEnemyMinSpeed + smallEnemyMaxSpeed) / 2;
     const bossScale = 2;
-    const enemyShotHitRadius = 1.4;
+    const enemyShotHitRadius = 1.6;
     const bossShotHitRadius = 1.2;
     const bossDifficulty = [
       { health: 30, speedMultiplier: 3.75, shotInterval: 1000, spawnInterval: 2100 },
