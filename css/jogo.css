@@ -38,7 +38,7 @@ body { position: relative; }
 #scene-transition { position: fixed; inset: 0; z-index: 10; background: #02040c; opacity: 0; pointer-events: none; transition: opacity .42s ease; }
 #scene-transition.active { opacity: 1; pointer-events: auto; }
 #message h1 { margin: 0 0 12px; color: var(--cyan); font-size: clamp(36px, 8vw, 76px); letter-spacing: .16em; text-shadow: 0 0 26px #1cbccc; }
-#message h1.loss { color: #ff315f; text-shadow: 0 0 26px #ff315f; }
+#message h1.loss { color: #ff001e; -webkit-text-stroke: 1px #ff9aa7; text-shadow: 0 2px 5px #000, 0 0 12px #ff001e, 0 0 34px #ff001e; }
 #message p { margin: 8px 0 26px; color: #d8e9ff; letter-spacing: .08em; }
 .loss-actions { display: grid; justify-items: center; gap: 12px; width: min(340px, 84vw); margin: 0 auto; }
 .loss-actions button { width: 100%; }

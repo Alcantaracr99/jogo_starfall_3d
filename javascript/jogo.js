@@ -22,6 +22,8 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
     const { rift, riftHalfWidth, riftHalfHeight } = criarAmbiente(scene, camera);
     // Entidades ativas e parametros fixos de gameplay.
     const ship = criarNaveJogador(); ship.scale.setScalar(.65); ship.position.set(0, 0, 7); ship.visible = false; scene.add(ship);
+    const shipDepartureDuration = 1.15, shipArrivalDuration = .85;
+    let shipTransition = null;
     const target = criarMira(); ship.add(target); target.position.z = -10.5; target.scale.setScalar(.36);
     const keys = {}; const enemies = []; const shots = []; const enemyShots = []; const missiles = []; const effects = [];
     const levelTargets = [50, 70, 90, 110, 130, 150, 170, 190, 210, 230];
@@ -188,19 +190,20 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
     }
     function makeEnergyShot(color, enemy = false) {
       const mesh = new THREE.Group();
-      const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .96, blending: THREE.AdditiveBlending, depthWrite: false });
+      const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .96, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: !enemy });
       const core = new THREE.Mesh(new THREE.SphereGeometry(enemy ? .18 : .22, 12, 8), material);
       const streak = new THREE.Mesh(new THREE.CylinderGeometry(enemy ? .045 : .06, enemy ? .09 : .12, enemy ? .9 : 1.35, 10), material);
       streak.rotation.x = Math.PI / 2;
-      streak.position.z = enemy ? .45 : .68;
+      streak.position.z = enemy ? 0 : .68;
+      core.position.z = enemy ? .5 : 0;
       const flare = new THREE.Mesh(new THREE.TorusGeometry(enemy ? .24 : .32, .025, 6, 16), material);
       flare.rotation.x = Math.PI / 2;
-      flare.position.z = enemy ? .15 : .35;
+      flare.position.z = enemy ? -.22 : .35;
       mesh.add(core, streak, flare);
       return mesh;
     }
     function fire() {
-      const now = performance.now(); if (!running || paused || now - lastShot < 120) return; lastShot = now;
+      const now = performance.now(); if (!running || paused || shipTransition?.type === 'arrive' || now - lastShot < 120) return; lastShot = now;
       const colors = [0x61f5ff, 0xff4f9a, 0xfff36b, 0x9b6cff];
       const mesh = makeEnergyShot(colors[shotSequence++ % colors.length]);
       mesh.position.copy(ship.position); mesh.position.z -= 1.9; scene.add(mesh);
@@ -210,7 +213,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       playSound(shotSound);
     }
     function enemyFire(enemy) {
-      const mesh = makeEnergyShot(0xff596f, true);
+      const mesh = makeEnergyShot(0xff1744, true);
       mesh.position.copy(enemy.mesh.position); mesh.position.z += 1.2; scene.add(mesh);
       enemyShots.push({ mesh, speed: 20 });
       playSound(shotSound);
@@ -233,7 +236,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       return mesh;
     }
     function fireMissileBarrage() {
-      if (!running || paused || missileCharge < missileKillRequirement || missiles.length || (!enemies.length && !boss)) return;
+      if (!running || paused || shipTransition?.type === 'arrive' || missileCharge < missileKillRequirement || missiles.length || (!enemies.length && !boss)) return;
       missileCharge = 0;
       const targets = enemies.slice().sort((first, second) => first.mesh.position.z - second.mesh.position.z);
       if (boss) targets.push(boss);
@@ -249,7 +252,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       updateHud();
     }
     function fireLaser() {
-      if (!running || paused || laserCharge < laserKillRequirement || laser) return;
+      if (!running || paused || shipTransition?.type === 'arrive' || laserCharge < laserKillRequirement || laser) return;
       laserCharge = 0;
       const mesh = new THREE.Group();
       const colors = [0x61f5ff, 0xff4f9a, 0xfff36b, 0x9b6cff];
@@ -311,6 +314,43 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       }).join('');
       levelMap.querySelectorAll('[data-level]').forEach(button => button.addEventListener('click', () => startLevel(Number(button.dataset.level))));
     }
+    function getShipEntryPosition() {
+      const bottomRay = new THREE.Vector3(0, -1, .5).unproject(camera).sub(camera.position);
+      const distance = (ship.position.z - camera.position.z) / bottomRay.z;
+      const screenBottom = camera.position.clone().addScaledVector(bottomRay, distance);
+      return new THREE.Vector3(0, screenBottom.y - 2.5, ship.position.z);
+    }
+    function beginShipArrival() {
+      ship.position.set(0, 0, 7);
+      const targetPosition = ship.position.clone();
+      const startPosition = getShipEntryPosition();
+      ship.position.copy(startPosition);
+      ship.visible = true;
+      shipTransition = { type: 'arrive', elapsed: 0, duration: shipArrivalDuration, startPosition, targetPosition };
+    }
+    function updateShipTransition(delta) {
+      if (!shipTransition) return;
+      const transition = shipTransition;
+      transition.elapsed = Math.min(transition.duration, transition.elapsed + delta);
+      const progress = transition.elapsed / transition.duration;
+      const eased = transition.type === 'depart'
+        ? progress * progress
+        : 1 - Math.pow(1 - progress, 3);
+      ship.position.lerpVectors(transition.startPosition, transition.targetPosition, eased);
+      if (transition.type === 'depart') ship.scale.setScalar(.65 * (1 - eased));
+      if (progress < 1) return;
+      shipTransition = null;
+      ship.scale.setScalar(.65);
+      if (transition.type === 'depart') {
+        ship.visible = false;
+        transition.onComplete();
+      } else {
+        ship.position.set(0, 0, 7);
+        clearKeys();
+        lastSpawn = performance.now();
+        aim.classList.remove('hidden');
+      }
+    }
     function showMap(title = 'MAPA DE MISSÕES', text = 'Escolha uma rota para continuar a campanha.', delay = 280) {
       if (transitionTimer) clearTimeout(transitionTimer);
       lossActions.classList.add('hidden');
@@ -353,8 +393,8 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       transitionTimer = setTimeout(() => {
         clearBattlefield();
         currentLevel = level; levelKills = 0; missileCharge = 0; score = level === 1 ? 0 : score; lives = 3; hitsTaken = 0; missionShotHits = 0; directImpacts = 0; damageBlink = null;
-        clearKeys(); running = true; paused = false; startMusic(); ship.position.set(0, 0, 7); ship.visible = true; lastSpawn = performance.now();
-        levelMap.classList.add('hidden'); startButton.classList.add('hidden'); message.classList.add('hidden'); gameHud.classList.remove('hidden'); special.classList.remove('hidden'); missileSpecial.classList.remove('hidden'); aim.classList.remove('hidden'); controls.classList.add('hidden'); bossHud.classList.add('hidden'); updateHud();
+        clearKeys(); running = true; paused = false; startMusic(); beginShipArrival(); lastSpawn = performance.now();
+        levelMap.classList.add('hidden'); startButton.classList.add('hidden'); message.classList.add('hidden'); gameHud.classList.remove('hidden'); special.classList.remove('hidden'); missileSpecial.classList.remove('hidden'); aim.classList.add('hidden'); controls.classList.add('hidden'); bossHud.classList.add('hidden'); updateHud();
         pauseMenu.classList.add('hidden');
         lossActions.classList.add('hidden');
         requestAnimationFrame(() => { sceneTransition.classList.remove('active'); message.classList.remove('screen-fade'); });
@@ -369,7 +409,19 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       unlockedLevel = Math.max(unlockedLevel, Math.min(10, currentLevel + 1));
       saveCampaign(false);
       const finished = currentLevel === 10;
-      showMap(finished ? 'CAMPANHA CONCLU\u00cdDA' : `N\u00cdVEL ${currentLevel} CONCLU\u00cdDO`, finished ? 'Voc\u00ea dominou toda a rota estelar.' : `PR\u00d3XIMO N\u00cdVEL: ${currentLevel + 1}. Prepare-se para a pr\u00f3xima miss\u00e3o.`, currentLevel % 2 === 0 ? 2500 : 280);
+      const mapDelay = currentLevel % 2 === 0 ? 2500 : 280;
+      shipTransition = {
+        type: 'depart',
+        elapsed: 0,
+        duration: shipDepartureDuration,
+        startPosition: ship.position.clone(),
+        targetPosition: new THREE.Vector3(ship.position.x, ship.position.y, -65),
+        onComplete: () => showMap(
+          finished ? 'CAMPANHA CONCLU\u00cdDA' : `N\u00cdVEL ${currentLevel} CONCLU\u00cdDO`,
+          finished ? 'Voc\u00ea dominou toda a rota estelar.' : `PR\u00d3XIMO N\u00cdVEL: ${currentLevel + 1}. Prepare-se para a pr\u00f3xima miss\u00e3o.`,
+          Math.max(0, mapDelay - shipDepartureDuration * 1000)
+        )
+      };
     }
     function getRiftSpawnPosition(depth) {
       return rift.localToWorld(new THREE.Vector3(
@@ -516,6 +568,8 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
     function endGame() {
       if (!running) return;
       running = false;
+      shipTransition = null;
+      ship.scale.setScalar(.65);
       if (respawnTimer) { clearTimeout(respawnTimer); respawnTimer = null; }
       paused = false;
       clearKeys();
@@ -568,6 +622,8 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
     function returnToMainMenu() {
       if (transitionTimer) clearTimeout(transitionTimer);
       transitionTimer = null;
+      shipTransition = null;
+      ship.scale.setScalar(.65);
       running = false;
       paused = false;
       clearKeys();
@@ -632,10 +688,12 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
     function animate() {
       requestAnimationFrame(animate); const delta = Math.min(clock.getDelta(), .05); const now = performance.now();
       rift.rotation.z = Math.sin(now * .00035) * .025;
+      updateShipTransition(delta);
       if (running && !paused) {
-        if (keys.space || keys.mouse) fire();
-        const horizontal = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
-        const vertical = (keys.arrowup || keys.w ? 1 : 0) - (keys.arrowdown || keys.s ? 1 : 0);
+        const entering = shipTransition?.type === 'arrive';
+        if (!entering && (keys.space || keys.mouse)) fire();
+        const horizontal = entering ? 0 : (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
+        const vertical = entering ? 0 : (keys.arrowup || keys.w ? 1 : 0) - (keys.arrowdown || keys.s ? 1 : 0);
         if (damageBlink) {
           damageBlink.timer -= delta;
           if (damageBlink.timer <= 0) {
@@ -652,7 +710,7 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
         }
         ship.position.x += horizontal * delta * 14;
         ship.position.y += vertical * delta * 11;
-        keepObjectOnScreen(ship.position, 1.2, .7);
+        if (!entering) keepObjectOnScreen(ship.position, 1.2, .7);
         ship.rotation.z += (horizontal * -.08 - ship.rotation.z) * delta * 8;
         atualizarVistaNaveJogador(ship, camera, delta);
         target.rotation.z -= delta * 1.6;
