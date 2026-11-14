@@ -43,3 +43,47 @@ html,body{touch-action:none;overscroll-behavior:none}#mobile-controls{position:f
   #special-track,#missile-track {height:4px;margin-top:2px;}
   #boss-hud {bottom:110px;}
 }
+
+
+/* Mobile HUD ultra compacto v3: uma linha de status e duas barras discretas. */
+@media (pointer:coarse), (max-width:700px) {
+  #game-hud.topbar {
+    position:fixed;top:env(safe-area-inset-top);left:env(safe-area-inset-left);right:calc(env(safe-area-inset-right) + 48px);
+    width:auto;height:29px;display:flex;align-items:stretch;gap:3px;
+    padding:2px 4px;margin:0;background:#020b17a6;z-index:4;
+  }
+  #game-hud.topbar.hidden {display:none!important;}
+  #game-hud .hud-card,#game-hud #objective-progress {
+    flex:1 1 0;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;
+    gap:3px;padding:2px 3px;margin:0;border-radius:3px;
+    box-shadow:none;background:#061525aa;
+  }
+  #game-hud .hud-label {font-size:7px;line-height:1;letter-spacing:0;white-space:nowrap;}
+  #game-hud .hud-card strong,#game-hud #objective-progress strong {
+    font-size:11px;line-height:1;letter-spacing:0;text-shadow:none;white-space:nowrap;
+  }
+  #game-hud #lives {font-size:11px!important;letter-spacing:-2px!important;text-shadow:none!important;}
+  #special,#missile-special {
+    position:fixed;top:calc(env(safe-area-inset-top) + 31px)!important;
+    transform:none!important;width:calc((100vw - 64px)/2);max-width:170px;
+    height:25px;padding:3px 5px;margin:0;overflow:hidden;
+    font-size:8px;line-height:10px;letter-spacing:0;text-align:left;
+    border-radius:3px;border:1px solid #61f5ff33;background:#031324a0;
+    box-shadow:none;text-shadow:none;z-index:4;
+  }
+  #special {left:4px!important;}
+  #missile-special {left:calc(8px + (100vw - 64px)/2)!important;}
+  #special-track,#missile-track {height:3px;margin-top:3px;border-width:0;border-radius:2px;box-shadow:none;}
+  #special-fill,#missile-fill {box-shadow:none;}
+  #mobile-pause {top:calc(env(safe-area-inset-top) + 3px);right:calc(env(safe-area-inset-right) + 5px);width:34px;height:34px;font-size:15px;}
+  #boss-hud {bottom:clamp(110px,23vh,155px);font-size:9px;}
+}
+@media (pointer:coarse) and (max-width:380px) {
+  #game-hud .hud-label {font-size:6px;}
+  #game-hud .hud-card strong,#game-hud #objective-progress strong {font-size:10px;}
+}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:430px) {
+  #game-hud.topbar {height:24px;}
+  #special,#missile-special {top:calc(env(safe-area-inset-top) + 26px)!important;height:21px;padding:2px 4px;font-size:7px;}
+  #special-track,#missile-track {height:2px;margin-top:2px;}
+}
