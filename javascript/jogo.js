@@ -111,6 +111,17 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
     // Sons ficam na pasta snd, relativa a este modulo.
     const shotSound = new Audio(new URL('../snd/tiro.mp3', import.meta.url));
     const actionMusic = new Audio(new URL('../snd/musica-acao.mp3', import.meta.url));
+    // Caso a faixa opcional seja enviada ao repositorio, utiliza-a no mobile.
+    if (location.pathname.includes('/mobile/')) {
+      const mobileMusic = new URL('../snd/musica-mobile.mp3', import.meta.url);
+      fetch(mobileMusic, { method: 'HEAD' }).then(response => {
+        if (response.ok) {
+          const wasPlaying = !actionMusic.paused;
+          actionMusic.src = mobileMusic.href;
+          if (wasPlaying) actionMusic.play().catch(() => {});
+        }
+      }).catch(() => {});
+    }
     const explosionSounds = Array.from({ length: 8 }, () => {
       const audio = new Audio(new URL('../snd/explosao.mp3', import.meta.url));
       audio.preload = 'auto';
