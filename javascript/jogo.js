@@ -233,6 +233,25 @@ import { criarNaveJogador, atualizarVistaNaveJogador, gerarExplosaoNave, atualiz
       flame.rotation.x = Math.PI / 2;
       flame.position.z = .52;
       mesh.add(flame);
+      // Barbatanas traseiras altas: quatro estabilizadores em cruz.
+      const finMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff8c45, emissive: 0x7c2112, emissiveIntensity: .65,
+        metalness: .7, roughness: .28, side: THREE.DoubleSide
+      });
+      const finShape = new THREE.Shape();
+      finShape.moveTo(0, -.15);
+      finShape.lineTo(.26, -.05);
+      finShape.lineTo(.30, .35);
+      finShape.lineTo(.06, .24);
+      finShape.lineTo(0, -.15);
+      const finGeometry = new THREE.ShapeGeometry(finShape);
+      for (let i = 0; i < 4; i++) {
+        const fin = new THREE.Mesh(finGeometry, finMaterial);
+        fin.rotation.y = i * Math.PI / 2;
+        fin.position.z = .33;
+        mesh.add(fin);
+      }
+      mesh.scale.setScalar(1.3);
       return mesh;
     }
     function fireMissileBarrage() {
