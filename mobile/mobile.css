@@ -87,3 +87,30 @@ html,body{touch-action:none;overscroll-behavior:none}#mobile-controls{position:f
   #special,#missile-special {top:calc(env(safe-area-inset-top) + 26px)!important;height:21px;padding:2px 4px;font-size:7px;}
   #special-track,#missile-track {height:2px;margin-top:2px;}
 }
+
+
+/* Refinamento v4: manter a estética neon, apenas reduzir as dimensões. */
+@media (pointer:coarse), (max-width:700px) {
+ #game-hud.topbar{height:24px;gap:2px;padding:1px 3px;background:transparent;}
+ #game-hud .hud-card,#game-hud #objective-progress{
+   padding:2px 3px;gap:2px;border:1px solid #61f5ff66;
+   background:linear-gradient(135deg,#061525e8,#10112be0);
+   box-shadow:0 0 6px #22dfff22,inset 0 0 5px #22dfff12;
+ }
+ #game-hud .hud-label{font-size:6px;letter-spacing:.03em;}
+ #game-hud .hud-card strong,#game-hud #objective-progress strong{font-size:10px;text-shadow:0 0 5px #61f5ff;}
+ #game-hud #lives{font-size:10px!important;letter-spacing:-1px!important;text-shadow:0 0 5px #ff477e!important;}
+ #special,#missile-special{
+   top:calc(env(safe-area-inset-top) + 26px)!important;
+   height:21px;padding:2px 4px;font-size:7px;line-height:9px;
+   border:1px solid #61f5ff55;
+   background:linear-gradient(135deg,#061525d9,#10112bd0);
+   text-shadow:0 0 4px currentColor;
+ }
+ #special-track,#missile-track{height:3px;margin-top:2px;border:1px solid currentColor;box-shadow:0 0 4px currentColor;}
+ #special-fill,#missile-fill{box-shadow:0 0 6px currentColor;}
+}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:430px){
+ #game-hud.topbar{height:21px;}
+ #special,#missile-special{top:calc(env(safe-area-inset-top) + 23px)!important;height:18px;}
+}
